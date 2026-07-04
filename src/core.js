@@ -10,6 +10,20 @@ export function makeRng(seed) {
   return f;
 }
 export const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
+
+// ---- Изометрия ----
+// Мир (квадратная сетка, пиксели) -> проекция 2:1. Клетка 64 -> ромб 192x96.
+export const ISOX = 1.5, ISOY = .75;
+export const proj = (x, y) => [(x - y) * ISOX, (x + y) * ISOY];
+// экранное направление -> мировое (для стиков)
+export function unprojDir(sx, sy) {
+  const wx = sx / (2 * ISOX) + sy / (2 * ISOY);
+  const wy = -sx / (2 * ISOX) + sy / (2 * ISOY);
+  const d = Math.hypot(wx, wy) || 1;
+  return [wx / d, wy / d];
+}
+// мировое направление -> экранный угол (для выбора ряда спрайта)
+export const isoAngle = (dx, dy) => Math.atan2((dx + dy) * ISOY, (dx - dy) * ISOX);
 export const lerp = (a, b, t) => a + (b - a) * t;
 export const dist2 = (ax, ay, bx, by) => { const dx = ax - bx, dy = ay - by; return dx * dx + dy * dy; };
 export const len = (x, y) => Math.hypot(x, y) || 1;

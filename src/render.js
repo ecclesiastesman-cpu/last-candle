@@ -1,7 +1,7 @@
 // Рендер: тайлы, стены, спрайты-марионетки с экипировкой, свет, частицы, числа.
 import { TILE } from './data.js';
 import { T_WALL, T_EXIT, T_ENTRY, isWall } from './world.js';
-import { clamp, lerp } from './core.js';
+import { clamp, lerp, proj, ISOX, ISOY } from './core.js';
 
 export class Renderer {
   constructor(canvas, assets) {
@@ -46,7 +46,7 @@ export class Renderer {
     this.canvas.width = innerWidth * dpr; this.canvas.height = innerHeight * dpr;
     this.canvas.style.width = innerWidth + 'px'; this.canvas.style.height = innerHeight + 'px';
     this.lightCanvas.width = Math.ceil(innerWidth / 4); this.lightCanvas.height = Math.ceil(innerHeight / 4);
-    this.zoom = clamp(Math.min(innerWidth, innerHeight) / 500, .85, 1.5);
+    this.zoom = clamp(Math.min(innerWidth, innerHeight) / 760, .5, .95);
   }
   // тонированный спрайт с кэшем
   tinted(img, tint, alpha = .55) {
@@ -63,10 +63,28 @@ export class Renderer {
     return c;
   }
   worldToScreen(x, y) {
-    return [(x - this.cam.x) * this.zoom + innerWidth / 2, (y - this.cam.y) * this.zoom + innerHeight / 2];
+    const [px, py] = proj(x, y);
+    return [(px - this.cam.px) * this.zoom + innerWidth / 2, (py - this.cam.py) * this.zoom + innerHeight / 2];
   }
-  screenToWorld(x, y) {
-    return [(x - innerWidth / 2) / this.zoom + this.cam.x, (y - innerHeight / 2) / this.zoom + this.cam.y];
+  screenToWorld(sx, sy) {
+    const px = (sx - innerWidth / 2) / this.zoom + this.cam.px;
+    const py = (sy - innerHeight / 2) / this.zoom + this.cam.py;
+    return [px / (2 * ISOX) + py / (2 * ISOY), py / (2 * ISOY) - px / (2 * ISOX)];
+  }
+  // тайл из атласа тайлсета: рисуется в сценических (проекционных) координатах
+  tileEntry(id) { return this.tilesMeta?.rects?.[String(id)]; }
+  drawAtlasTile(id, wx, wy) {
+    const e = this.tileEntry(id);
+    if (!e || !this.tilesImg) return false;
+    const [px, py] = proj(wx, wy);
+    this.ctx.drawImage(this.tilesImg, e[0], e[1], e[2], e[3], px - e[4], py - e[5], e[2], e[3]);
+    return true;
+  }
+  pickVariant(group, tx, ty) {
+    const ids = this.tilesMeta?.groups?.[group];
+    if (!ids) return null;
+    const h = ((tx * 73856093) ^ (ty * 19349663)) >>> 0;
+    return ids[h % ids.length];
   }
 
   drawFloor(g, timeS) {
@@ -82,90 +100,99 @@ export class Renderer {
     ctx.save();
     ctx.translate(innerWidth / 2 + shx, innerHeight / 2 + shy);
     ctx.scale(z, z);
-    ctx.translate(-this.cam.x, -this.cam.y);
-    const tileImg = this.assets[g.actData.tiles];
-    const x0 = Math.floor((this.cam.x - innerWidth / 2 / z) / TILE) - 1, x1 = Math.ceil((this.cam.x + innerWidth / 2 / z) / TILE) + 1;
-    const y0 = Math.floor((this.cam.y - innerHeight / 2 / z) / TILE) - 1, y1 = Math.ceil((this.cam.y + innerHeight / 2 / z) / TILE) + 1;
-    for (let ty = Math.max(0, y0); ty <= Math.min(f.H - 1, y1); ty++) {
-      for (let tx = Math.max(0, x0); tx <= Math.min(f.W - 1, x1); tx++) {
+    ctx.translate(-this.cam.px, -this.cam.py);
+    // видимый диапазон клеток — по обратной проекции углов экрана
+    const cs = [[0, 0], [innerWidth, 0], [0, innerHeight], [innerWidth, innerHeight]]
+      .map(c => this.screenToWorld(c[0], c[1]));
+    const x0 = Math.max(0, Math.floor(Math.min(cs[0][0], cs[1][0], cs[2][0], cs[3][0]) / TILE) - 1);
+    const x1 = Math.min(f.W - 1, Math.ceil(Math.max(cs[0][0], cs[1][0], cs[2][0], cs[3][0]) / TILE) + 1);
+    const y0 = Math.max(0, Math.floor(Math.min(cs[0][1], cs[1][1], cs[2][1], cs[3][1]) / TILE) - 1);
+    const y1 = Math.min(f.H - 1, Math.ceil(Math.max(cs[0][1], cs[1][1], cs[2][1], cs[3][1]) / TILE) + 1);
+    this.visRange = [x0, x1, y0, y1];
+    const actGroups = { 1: ['floor', 'paved'], 2: ['dirt', 'floor'], 3: ['paved', 'floor'], 4: ['dirt', 'rune'] }[f.act] || ['floor'];
+    for (let ty = y0; ty <= y1; ty++) {
+      for (let tx = x0; tx <= x1; tx++) {
         const t = f.g[ty * f.W + tx];
         if (t === T_WALL) continue;
-        if (tileImg) ctx.drawImage(tileImg, tx * TILE, ty * TILE, TILE + .5, TILE + .5);
-        else { ctx.fillStyle = '#2b2b31'; ctx.fillRect(tx * TILE, ty * TILE, TILE, TILE); }
+        const h = ((tx * 73856093) ^ (ty * 19349663)) >>> 0;
+        const group = (h % 100) < 82 ? actGroups[0] : actGroups[1];
+        const id = this.pickVariant(group, tx, ty);
+        if (id === null || !this.drawAtlasTile(id, tx * TILE, ty * TILE)) {
+          // фолбэк-ромб
+          const [px, py] = proj(tx * TILE, ty * TILE);
+          ctx.fillStyle = '#2b2b31';
+          ctx.beginPath();
+          ctx.moveTo(px, py); ctx.lineTo(px + 96, py + 48); ctx.lineTo(px, py + 96); ctx.lineTo(px - 96, py + 48);
+          ctx.closePath(); ctx.fill();
+        }
         if (t === T_EXIT || t === T_ENTRY) {
           const p = this.assets.dec_portal;
           const pul = 1 + Math.sin(timeS * 3) * .06;
-          if (p) { ctx.globalAlpha = t === T_EXIT ? 1 : .45; ctx.drawImage(p, tx * TILE + TILE / 2 - 38 * pul, ty * TILE + TILE / 2 - 38 * pul, 76 * pul, 76 * pul); ctx.globalAlpha = 1; }
+          if (p) {
+            const [px, py] = proj(tx * TILE + TILE / 2, ty * TILE + TILE / 2);
+            ctx.globalAlpha = t === T_EXIT ? 1 : .45;
+            ctx.save(); ctx.translate(px, py); ctx.scale(1.25, .66);
+            ctx.drawImage(p, -52 * pul, -52 * pul, 104 * pul, 104 * pul);
+            ctx.restore(); ctx.globalAlpha = 1;
+          }
         }
       }
     }
-    // декали пола: кровь, трещины, мох (под сущностями, поверх тайлов)
+    // декали пола (проецируем и приплюскиваем)
     for (const d of f.decals) {
-      if (Math.abs(d.x - this.cam.x) > innerWidth || Math.abs(d.y - this.cam.y) > innerHeight) continue;
+      const dtx = d.x / TILE | 0, dty = d.y / TILE | 0;
+      if (dtx < x0 || dtx > x1 || dty < y0 || dty > y1) continue;
+      const [px, py] = proj(d.x, d.y);
       ctx.save();
-      ctx.translate(d.x, d.y); ctx.rotate(d.a);
+      ctx.translate(px, py); ctx.scale(1.5, .75);
       if (d.kind === 'blood') {
-        ctx.fillStyle = 'rgba(96,10,18,0.5)';
-        ctx.beginPath(); ctx.ellipse(0, 0, d.r, d.r * .6, 0, 0, 7); ctx.fill();
-        ctx.fillStyle = 'rgba(70,6,12,0.55)';
-        for (let i = 0; i < 4; i++) { const a2 = d.seed * .7 + i * 1.9; ctx.beginPath(); ctx.arc(Math.cos(a2) * d.r * .9, Math.sin(a2) * d.r * .55, d.r * .18, 0, 7); ctx.fill(); }
+        ctx.fillStyle = 'rgba(96,10,18,0.45)';
+        ctx.beginPath(); ctx.ellipse(0, 0, d.r, d.r * .8, 0, 0, 7); ctx.fill();
+        ctx.fillStyle = 'rgba(70,6,12,0.5)';
+        for (let i = 0; i < 4; i++) { const a2 = d.seed * .7 + i * 1.9; ctx.beginPath(); ctx.arc(Math.cos(a2) * d.r * .9, Math.sin(a2) * d.r * .7, d.r * .18, 0, 7); ctx.fill(); }
       } else if (d.kind === 'crack') {
-        ctx.strokeStyle = 'rgba(0,0,0,0.5)'; ctx.lineWidth = 2;
+        ctx.strokeStyle = 'rgba(0,0,0,0.45)'; ctx.lineWidth = 2;
         ctx.beginPath(); ctx.moveTo(-d.r, 0);
-        for (let i = 1; i <= 4; i++) ctx.lineTo(-d.r + d.r * i * .5, Math.sin(d.seed + i * 2.1) * d.r * .3);
+        for (let i = 1; i <= 4; i++) ctx.lineTo(-d.r + d.r * i * .5, Math.sin(d.seed + i * 2.1) * d.r * .35);
         ctx.stroke();
       } else {
-        ctx.fillStyle = 'rgba(70,92,48,0.28)';
-        ctx.beginPath(); ctx.ellipse(0, 0, d.r, d.r * .7, 0, 0, 7); ctx.fill();
+        ctx.fillStyle = 'rgba(70,92,48,0.25)';
+        ctx.beginPath(); ctx.ellipse(0, 0, d.r, d.r * .8, 0, 0, 7); ctx.fill();
       }
       ctx.restore();
     }
-    // стены: кирпичная кладка из текстуры акта, объём и тени
-    const wp = this.wallPattern(g);
-    const WALL_H = 26; // высота "лица" стены над её тайлом
-    for (let ty = Math.max(0, y0); ty <= Math.min(f.H - 1, y1); ty++) {
-      for (let tx = Math.max(0, x0); tx <= Math.min(f.W - 1, x1); tx++) {
-        if (f.g[ty * f.W + tx] !== T_WALL) continue;
-        if (isWall(f, tx - 1, ty) && isWall(f, tx + 1, ty) && isWall(f, tx, ty - 1) && isWall(f, tx, ty + 1)
-          && isWall(f, tx - 1, ty - 1) && isWall(f, tx + 1, ty + 1) && isWall(f, tx - 1, ty + 1) && isWall(f, tx + 1, ty - 1)) continue;
-        const x = tx * TILE, y = ty * TILE;
-        // тень стены на пол справа-снизу (объём)
-        if (!isWall(f, tx, ty + 1)) { ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.fillRect(x, y + TILE, TILE, 10); }
-        if (!isWall(f, tx + 1, ty)) { ctx.fillStyle = 'rgba(0,0,0,0.25)'; ctx.fillRect(x + TILE, y, 8, TILE); }
-        // лицо стены
-        ctx.drawImage(wp, x, y - WALL_H, TILE, TILE + WALL_H);
-        // верхняя кромка (свет) и низ (тьма)
-        ctx.fillStyle = 'rgba(235,215,180,0.10)'; ctx.fillRect(x, y - WALL_H, TILE, 4);
-        const grad = ctx.createLinearGradient(0, y + TILE - 22, 0, y + TILE);
-        grad.addColorStop(0, 'rgba(0,0,0,0)'); grad.addColorStop(1, 'rgba(0,0,0,0.5)');
-        ctx.fillStyle = grad; ctx.fillRect(x, y + TILE - 22, TILE, 22);
-        // угловые засветы от соседнего пола сверху не нужны — свет решает
-      }
+  }
+
+  // стена-блок (рисуется в глубинном проходе)
+  drawWallCell(g, tx, ty) {
+    const id = this.pickVariant('wall', tx, ty);
+    if (id === null || !this.drawAtlasTile(id, tx * TILE, ty * TILE)) {
+      const [px, py] = proj(tx * TILE, ty * TILE);
+      this.ctx.fillStyle = g.actData.wall;
+      this.ctx.fillRect(px - 96, py - 60, 192, 156);
     }
-    // стоячие жаровни с живым пламенем (на позициях факелов)
-    for (const t of f.torches) {
-      const wx = t.x * TILE + TILE / 2, wy = t.y * TILE + TILE / 2;
-      if (Math.abs(wx - this.cam.x) > innerWidth || Math.abs(wy - this.cam.y) > innerHeight) continue;
-      ctx.save();
-      ctx.translate(wx, wy);
-      // чаша и нога
-      ctx.fillStyle = 'rgba(0,0,0,0.4)'; ctx.beginPath(); ctx.ellipse(0, 6, 9, 3.5, 0, 0, 7); ctx.fill();
-      ctx.fillStyle = '#241d14'; ctx.fillRect(-2, -16, 4, 22);
-      ctx.fillStyle = '#382a1c'; ctx.beginPath(); ctx.ellipse(0, -17, 8, 3.5, 0, 0, 7); ctx.fill();
-      // пламя: два лепестка с фликером
-      const fl = Math.sin(timeS * 13 + wx) * .22 + Math.sin(timeS * 29 + wy) * .12;
-      ctx.globalAlpha = .85;
-      ctx.fillStyle = '#ff9840';
-      ctx.beginPath();
-      ctx.moveTo(-5, -18); ctx.quadraticCurveTo(-6, -30 - fl * 8, 0, -36 - fl * 10);
-      ctx.quadraticCurveTo(6, -30 - fl * 6, 5, -18); ctx.closePath(); ctx.fill();
-      ctx.fillStyle = '#ffd75e';
-      ctx.beginPath();
-      ctx.moveTo(-2.5, -18); ctx.quadraticCurveTo(-3, -25 - fl * 5, 0, -29 - fl * 7);
-      ctx.quadraticCurveTo(3, -25 - fl * 4, 2.5, -18); ctx.closePath(); ctx.fill();
-      ctx.globalAlpha = 1;
-      ctx.restore();
-    }
+  }
+  // стоячая жаровня с живым пламенем
+  drawBrazier(wx, wy, timeS) {
+    const { ctx } = this;
+    const [px, py] = proj(wx, wy);
+    ctx.save();
+    ctx.translate(px, py);
+    ctx.fillStyle = 'rgba(0,0,0,0.4)'; ctx.beginPath(); ctx.ellipse(0, 4, 14, 5.5, 0, 0, 7); ctx.fill();
+    ctx.fillStyle = '#241d14'; ctx.fillRect(-2.5, -20, 5, 26);
+    ctx.fillStyle = '#382a1c'; ctx.beginPath(); ctx.ellipse(0, -21, 10, 4.5, 0, 0, 7); ctx.fill();
+    const fl = Math.sin(timeS * 13 + wx) * .22 + Math.sin(timeS * 29 + wy) * .12;
+    ctx.globalAlpha = .85;
+    ctx.fillStyle = '#ff9840';
+    ctx.beginPath();
+    ctx.moveTo(-6, -22); ctx.quadraticCurveTo(-7, -36 - fl * 9, 0, -43 - fl * 11);
+    ctx.quadraticCurveTo(7, -36 - fl * 7, 6, -22); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#ffd75e';
+    ctx.beginPath();
+    ctx.moveTo(-3, -22); ctx.quadraticCurveTo(-3.5, -30 - fl * 5, 0, -34 - fl * 8);
+    ctx.quadraticCurveTo(3.5, -30 - fl * 4, 3, -22); ctx.closePath(); ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.restore();
   }
 
   // трупы (анимация смерти + затухание)
@@ -176,7 +203,8 @@ export class Renderer {
       if (!fm) continue;
       const fscale = (c.r * 6.1 / fm.ay) * (c.fscale || 1);
       const alpha = c.t < 2.5 ? 1 : Math.max(0, 1 - (c.t - 2.5) / 1.5);
-      g.flare.draw(ctx, c.flare, c.x, c.y + 4, 'die', c.t * 1000, c.angle, fscale, alpha);
+      const [cpx, cpy] = proj(c.x, c.y);
+      g.flare.draw(ctx, c.flare, cpx, cpy + 4, 'die', c.t * 1000, c.angle, fscale, alpha);
     }
   }
 
@@ -188,9 +216,10 @@ export class Renderer {
       const s = g.flare.heroSheet;
       const fscale = 100 / s.meta.ay;
       ctx.save();
-      ctx.translate(h.x, h.y);
+      const [hpx, hpy] = proj(h.x, h.y);
+      ctx.translate(hpx, hpy);
       ctx.fillStyle = 'rgba(0,0,0,0.45)';
-      ctx.beginPath(); ctx.ellipse(0, 5, 17, 7, 0, 0, 7); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(0, 5, 22, 9, 0, 0, 7); ctx.fill();
       if (h.hurtT > 0) ctx.globalAlpha = .6 + Math.sin(timeS * 60) * .3;
       const anim = h.dead ? 'die' : h.action ? h.action.name : h.moving ? 'run' : 'stance';
       const t = h.dead ? h.deadT * 1000 : h.action ? h.action.t : h.animT * 1000;
@@ -214,7 +243,8 @@ export class Renderer {
     const bob = Math.sin(h.animT * 9) * (h.moving ? 3 : .8);
     const lunge = h.attackT > 0 ? Math.sin((0.22 - h.attackT) / 0.22 * Math.PI) * 9 : 0;
     ctx.save();
-    ctx.translate(h.x + h.dir * lunge * .4, h.y + bob * .3);
+    const [fpx, fpy] = proj(h.x, h.y);
+    ctx.translate(fpx + h.dir * lunge * .4, fpy + bob * .3);
     // тень
     ctx.fillStyle = 'rgba(0,0,0,0.45)';
     ctx.beginPath(); ctx.ellipse(0, size * .38, size * .3, size * .11, 0, 0, 7); ctx.fill();
@@ -260,9 +290,10 @@ export class Renderer {
     const { ctx } = this;
     const size = m.r * 4.6;
     ctx.save();
-    ctx.translate(m.x, m.y);
+    const [mpx, mpy] = proj(m.x, m.y);
+    ctx.translate(mpx, mpy);
     ctx.fillStyle = 'rgba(0,0,0,0.4)';
-    ctx.beginPath(); ctx.ellipse(0, 4, m.r * 1.2, m.r * .45, 0, 0, 7); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(0, 4, m.r * 1.6, m.r * .6, 0, 0, 7); ctx.fill();
     if (m.elite) { // аура элитки
       ctx.strokeStyle = m.tint; ctx.globalAlpha = .5 + Math.sin(timeS * 5) * .2;
       ctx.lineWidth = 2.5; ctx.beginPath(); ctx.arc(0, 4, m.r * 1.4, 0, 7); ctx.stroke();
@@ -295,10 +326,11 @@ export class Renderer {
     ctx.restore();
     ctx.filter = 'none'; ctx.globalAlpha = 1;
     if (m.hp < m.maxHp && !m.boss) { // полоска HP
+      const [bpx, bpy] = proj(m.x, m.y);
       const w = m.r * 2.4;
-      ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(m.x - w / 2, m.y - size * .62, w, 4);
+      ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(bpx - w / 2, bpy - size * .62, w, 4);
       ctx.fillStyle = m.elite ? '#ffd54f' : '#a3162e';
-      ctx.fillRect(m.x - w / 2, m.y - size * .62, w * clamp(m.hp / m.maxHp, 0, 1), 4);
+      ctx.fillRect(bpx - w / 2, bpy - size * .62, w * clamp(m.hp / m.maxHp, 0, 1), 4);
     }
   }
 
@@ -306,27 +338,28 @@ export class Renderer {
     const { ctx } = this;
     for (const d of g.drops) {
       const bounce = Math.max(0, Math.sin(Math.min(d.t * 6, Math.PI))) * 14;
-      const y = d.y - bounce;
+      const [dpx, dpyRaw] = proj(d.x, d.y);
+      const y = dpyRaw - bounce;
       if (d.kind === 'gold') {
-        ctx.fillStyle = '#ffd75e'; ctx.beginPath(); ctx.arc(d.x, y, 5, 0, 7); ctx.fill();
-        ctx.fillStyle = '#a67c00'; ctx.fillRect(d.x - 3, y - 1, 6, 2);
+        ctx.fillStyle = '#ffd75e'; ctx.beginPath(); ctx.arc(dpx, y, 5, 0, 7); ctx.fill();
+        ctx.fillStyle = '#a67c00'; ctx.fillRect(dpx - 3, y - 1, 6, 2);
       } else if (d.kind === 'potion') {
-        ctx.fillStyle = '#c62828'; ctx.beginPath(); ctx.arc(d.x, y, 6, 0, 7); ctx.fill();
-        ctx.fillStyle = '#8d6e63'; ctx.fillRect(d.x - 2, y - 10, 4, 5);
+        ctx.fillStyle = '#c62828'; ctx.beginPath(); ctx.arc(dpx, y, 6, 0, 7); ctx.fill();
+        ctx.fillStyle = '#8d6e63'; ctx.fillRect(dpx - 2, y - 10, 4, 5);
       } else {
         const col = ({ common: '#c8c2b8', magic: '#7aa9ff', rare: '#ffd75e', set: '#61d97a', unique: '#ff9840' })[d.item.rarity];
         ctx.save();
         ctx.shadowColor = col; ctx.shadowBlur = d.item.rarity === 'common' ? 4 : 12 + Math.sin(timeS * 4) * 4;
         const icon = this.assets[d.item.icon];
-        if (icon) ctx.drawImage(icon, d.x - 15, y - 15, 30, 30);
-        else { ctx.fillStyle = col; ctx.fillRect(d.x - 8, y - 8, 16, 16); }
+        if (icon) ctx.drawImage(icon, dpx - 15, y - 15, 30, 30);
+        else { ctx.fillStyle = col; ctx.fillRect(dpx - 8, y - 8, 16, 16); }
         ctx.restore();
         // луч света для редких+
         if (d.item.rarity !== 'common' && d.item.rarity !== 'magic') {
-          const grad = ctx.createLinearGradient(d.x, y - 70, d.x, y);
+          const grad = ctx.createLinearGradient(dpx, y - 70, dpx, y);
           grad.addColorStop(0, 'rgba(255,255,255,0)');
           grad.addColorStop(1, col + 'aa');
-          ctx.fillStyle = grad; ctx.fillRect(d.x - 2, y - 70, 4, 70);
+          ctx.fillStyle = grad; ctx.fillRect(dpx - 2, y - 70, 4, 70);
         }
         // D2-стиль: подпись предмета на полу (редкие+ всегда, прочие — рядом с героем)
         const near = Math.abs(d.x - g.hero.x) < 150 && Math.abs(d.y - g.hero.y) < 150;
@@ -334,9 +367,9 @@ export class Renderer {
           ctx.font = 'bold 11px Georgia, serif';
           const tw = ctx.measureText(d.item.name).width;
           ctx.fillStyle = 'rgba(5,4,2,0.78)';
-          ctx.fillRect(d.x - tw / 2 - 5, y - 42, tw + 10, 15);
+          ctx.fillRect(dpx - tw / 2 - 5, y - 42, tw + 10, 15);
           ctx.fillStyle = col; ctx.textAlign = 'center';
-          ctx.fillText(d.item.name, d.x, y - 31);
+          ctx.fillText(d.item.name, dpx, y - 31);
         }
       }
     }
@@ -346,23 +379,26 @@ export class Renderer {
     const { ctx } = this;
     // зоны
     for (const z of g.zones) {
+      const [zpx, zpy] = proj(z.x, z.y);
       ctx.globalAlpha = .16 + Math.sin(timeS * 8) * .05;
-      ctx.fillStyle = z.color; ctx.beginPath(); ctx.arc(z.x, z.y, z.r, 0, 7); ctx.fill();
+      ctx.fillStyle = z.color; ctx.beginPath(); ctx.ellipse(zpx, zpy, z.r * ISOX, z.r * ISOY, 0, 0, 7); ctx.fill();
       ctx.globalAlpha = .5; ctx.strokeStyle = z.color; ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.arc(z.x, z.y, z.r, 0, 7); ctx.stroke();
+      ctx.beginPath(); ctx.ellipse(zpx, zpy, z.r * ISOX, z.r * ISOY, 0, 0, 7); ctx.stroke();
       ctx.globalAlpha = 1;
     }
     for (const t of g.traps) {
+      const [tpx, tpy] = proj(t.x, t.y);
       ctx.globalAlpha = t.armT > 0 ? .35 : .8;
       ctx.strokeStyle = t.elem === 'cold' ? '#4fc3f7' : '#ff7043'; ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.arc(t.x, t.y, 9 + Math.sin(timeS * 6) * 2, 0, 7); ctx.stroke();
+      ctx.beginPath(); ctx.ellipse(tpx, tpy, (9 + Math.sin(timeS * 6) * 2) * 1.5, (9 + Math.sin(timeS * 6) * 2) * .75, 0, 0, 7); ctx.stroke();
       ctx.globalAlpha = 1;
     }
     // снаряды
     for (const p of g.projectiles) {
       ctx.save();
-      ctx.translate(p.x, p.y);
-      ctx.rotate(Math.atan2(p.vy, p.vx));
+      const [ppx, ppy] = proj(p.x, p.y);
+      ctx.translate(ppx, ppy);
+      ctx.rotate(Math.atan2((p.vx + p.vy) * ISOY, (p.vx - p.vy) * ISOX));
       if (p.arrow) { ctx.strokeStyle = '#e8dcc0'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(-9, 0); ctx.lineTo(9, 0); ctx.stroke(); }
       else { ctx.shadowColor = p.color; ctx.shadowBlur = 10; ctx.fillStyle = p.color; ctx.beginPath(); ctx.arc(0, 0, p.r, 0, 7); ctx.fill(); }
       ctx.restore();
@@ -396,7 +432,7 @@ export class Renderer {
     const lc = this.lightCanvas, lx = lc.getContext('2d');
     const z = this.zoom / 4 * this.dpr / this.dpr;
     lx.globalCompositeOperation = 'source-over';
-    lx.fillStyle = 'rgba(0,0,0,0.93)';
+    lx.fillStyle = 'rgba(0,0,0,0.9)';
     lx.fillRect(0, 0, lc.width, lc.height);
     lx.globalCompositeOperation = 'destination-out';
     const put = (wx, wy, r, a) => {
@@ -411,8 +447,9 @@ export class Renderer {
     put(g.hero.x, g.hero.y, g.stats.lightRadius * flick, 1);
     for (const t of g.floor.torches) {
       const wx = t.x * TILE + TILE / 2, wy = t.y * TILE + TILE / 2;
-      if (Math.abs(wx - this.cam.x) > innerWidth || Math.abs(wy - this.cam.y) > innerHeight) continue;
-      put(wx, wy, 110 * flick, .8);
+      const [tpx, tpy] = proj(wx, wy);
+      if (Math.abs(tpx - this.cam.px) > innerWidth * 1.2 || Math.abs(tpy - this.cam.py) > innerHeight * 1.2) continue;
+      put(wx, wy, 190 * flick, .85);
     }
     for (const p of g.projectiles) if (p.color && !p.arrow) put(p.x, p.y, 60, .7);
     for (const z2 of g.zones) put(z2.x, z2.y, z2.r * 1.2, .5);
@@ -426,17 +463,18 @@ export class Renderer {
   // ---- fx API (вызывается геймплеем через g.fx) ----
   fxApi() {
     const self = this;
+    const P = (x, y) => proj(x, y);
     return {
-      number(x, y, v, c, big) { if (self.numbers.length < 60) self.numbers.push({ x, y, txt: String(v), c, t: .8, big }); },
-      text(x, y, txt, c) { self.numbers.push({ x, y, txt, c, t: 1.2, big: true }); },
-      burst(x, y, n, c) { for (let i = 0; i < n && self.particles.length < 300; i++) { const a = Math.random() * 7, sp = 40 + Math.random() * 120; self.particles.push({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 40, t: .4 + Math.random() * .4, c, s: 2 + Math.random() * 3, grav: 300 }); } },
-      explosion(x, y, r, c) { this.burst(x, y, 26, c); self.cam.shake = Math.max(self.cam.shake, 10); },
-      slash(x, y, ang, r) { for (let i = 0; i < 6 && self.particles.length < 300; i++) { const a = ang + (Math.random() - .5) * 1; self.particles.push({ x: x + Math.cos(a) * r * .7, y: y + Math.sin(a) * r * .7, vx: Math.cos(a) * 90, vy: Math.sin(a) * 90, t: .18, c: '#e8dcc0', s: 2.5 }); } },
-      nova(x, y, r, c) { for (let i = 0; i < 22 && self.particles.length < 300; i++) { const a = i / 22 * 7; self.particles.push({ x, y, vx: Math.cos(a) * r * 2.4, vy: Math.sin(a) * r * 2.4, t: .4, c, s: 3.5 }); } },
-      lightning(x0, y0, x1, y1) { const n = 7; for (let i = 0; i <= n && self.particles.length < 298; i++) { const t = i / n; self.particles.push({ x: lerp(x0, x1, t) + (Math.random() - .5) * 14, y: lerp(y0, y1, t) + (Math.random() - .5) * 14, vx: 0, vy: 0, t: .15, c: '#c9b3ff', s: 3.5 }); } },
-      dashTrail(x0, y0, x1, y1) { const n = 9; for (let i = 0; i <= n && self.particles.length < 298; i++) { const t = i / n; self.particles.push({ x: lerp(x0, x1, t), y: lerp(y0, y1, t), vx: 0, vy: 0, t: .25, c: '#9fb4c7', s: 4 }); } },
-      buff(x, y) { this.burst(x, y, 14, '#ffd75e'); },
-      levelUp(x, y) { this.burst(x, y, 40, '#ffd75e'); self.cam.shake = Math.max(self.cam.shake, 6); self.flashes.push({ t: .4, c: '255,215,94' }); },
+      number(xw, yw, v, c, big) { const [x, y] = P(xw, yw); if (self.numbers.length < 60) self.numbers.push({ x, y, txt: String(v), c, t: .8, big }); },
+      text(xw, yw, txt, c) { const [x, y] = P(xw, yw); self.numbers.push({ x, y, txt, c, t: 1.2, big: true }); },
+      burst(xw, yw, n, c) { const [x, y] = P(xw, yw); for (let i = 0; i < n && self.particles.length < 300; i++) { const a = Math.random() * 7, sp = 40 + Math.random() * 120; self.particles.push({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 40, t: .4 + Math.random() * .4, c, s: 2 + Math.random() * 3, grav: 300 }); } },
+      explosion(xw, yw, r, c) { const x = xw, y = yw; this.burst(x, y, 26, c); self.cam.shake = Math.max(self.cam.shake, 10); },
+      slash(xw, yw, ang, r) { const [x, y] = P(xw, yw); for (let i = 0; i < 6 && self.particles.length < 300; i++) { const a = ang + (Math.random() - .5) * 1; self.particles.push({ x: x + Math.cos(a) * r * .7, y: y + Math.sin(a) * r * .7, vx: Math.cos(a) * 90, vy: Math.sin(a) * 90, t: .18, c: '#e8dcc0', s: 2.5 }); } },
+      nova(xw, yw, r, c) { const [x, y] = P(xw, yw); for (let i = 0; i < 22 && self.particles.length < 300; i++) { const a = i / 22 * 7; self.particles.push({ x, y, vx: Math.cos(a) * r * 2.4, vy: Math.sin(a) * r * 2.4, t: .4, c, s: 3.5 }); } },
+      lightning(x0w, y0w, x1w, y1w) { const [x0, y0] = P(x0w, y0w); const [x1, y1] = P(x1w, y1w); const n = 7; for (let i = 0; i <= n && self.particles.length < 298; i++) { const t = i / n; self.particles.push({ x: lerp(x0, x1, t) + (Math.random() - .5) * 14, y: lerp(y0, y1, t) + (Math.random() - .5) * 14, vx: 0, vy: 0, t: .15, c: '#c9b3ff', s: 3.5 }); } },
+      dashTrail(x0w, y0w, x1w, y1w) { const [x0, y0] = P(x0w, y0w); const [x1, y1] = P(x1w, y1w); const n = 9; for (let i = 0; i <= n && self.particles.length < 298; i++) { const t = i / n; self.particles.push({ x: lerp(x0, x1, t), y: lerp(y0, y1, t), vx: 0, vy: 0, t: .25, c: '#9fb4c7', s: 4 }); } },
+      buff(xw, yw) { this.burst(xw, yw, 14, '#ffd75e'); },
+      levelUp(xw, yw) { this.burst(xw, yw, 40, '#ffd75e'); self.cam.shake = Math.max(self.cam.shake, 6); self.flashes.push({ t: .4, c: '255,215,94' }); },
       shake(v) { self.cam.shake = Math.max(self.cam.shake, v); },
     };
   }
