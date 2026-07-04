@@ -49,7 +49,7 @@ export class Input {
     const BIND = { KeyW: 'up', KeyS: 'down', KeyA: 'left', KeyD: 'right',
       ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right',
       Space: 'attack', KeyJ: 'attack', KeyK: 'skill1', KeyL: 'skill2', KeyU: 'skill3', KeyI: 'skill4',
-      KeyQ: 'potion', KeyE: 'interact', Tab: 'inventory', KeyC: 'character', KeyT: 'talents', Escape: 'menu' };
+      KeyQ: 'potion', KeyE: 'interact', KeyP: 'townportal', Tab: 'inventory', KeyC: 'character', KeyT: 'talents', Escape: 'menu' };
     addEventListener('keydown', e => { const c = BIND[e.code]; if (c) { if (!this.held.has(c)) this.pressedOnce.add(c); this.held.add(c); e.preventDefault(); } });
     addEventListener('keyup', e => { const c = BIND[e.code]; if (c) this.held.delete(c); });
 

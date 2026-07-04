@@ -1,0 +1,43 @@
+id,role,type,description,size_ratio,style,source
+hero_barbarian,player class sprite,sprite,grim barbarian warrior with heavy pauldrons bare arms,1:1 magenta key,FORMULA,generate
+hero_huntress,player class sprite,sprite,grim hooded huntress ranger with a longbow,1:1 magenta key,FORMULA,generate
+hero_mage,player class sprite,sprite,gaunt elemental mage in tattered arcane robes holding a staff,1:1 magenta key,FORMULA,generate
+hero_warlock,player class sprite,sprite,sinister warlock in dark ritual robes with bone talismans,1:1 magenta key,FORMULA,generate
+hero_druid,player class sprite,sprite,wild druid in furs and antlers with a gnarled club,1:1 magenta key,FORMULA,generate
+form_wolf,druid werewolf form sprite,sprite,feral werewolf beast on two legs with matted fur,1:1 magenta key,FORMULA,generate
+form_bear,druid werebear form sprite,sprite,massive werebear beast with scarred hide,1:1 magenta key,FORMULA,generate
+mob_skeleton,act1 melee monster,sprite,skeleton warrior with rusted sword and cracked bones,1:1 magenta key,FORMULA,generate
+mob_zombie,act1 slow monster,sprite,rotting shambling zombie corpse,1:1 magenta key,FORMULA,generate
+mob_ghoul,act1-2 fast monster,sprite,crawling pale ghoul with long claws,1:1 magenta key,FORMULA,generate
+mob_bloater,act2 exploder monster,sprite,bloated plague-swollen corpse dripping pus,1:1 magenta key,FORMULA,generate
+mob_cultist,act2-3 caster monster,sprite,hooded plague cultist with a ritual knife,1:1 magenta key,FORMULA,generate
+mob_hound,act3-4 fast monster,sprite,snarling hellhound wreathed in embers,1:1 magenta key,FORMULA,generate
+mob_imp,act4 ranged monster,sprite,small horned fire imp,1:1 magenta key,FORMULA,generate
+mob_knight,act3-4 heavy monster,sprite,towering hell knight in black spiked armor,1:1 magenta key,FORMULA,generate
+boss_bone,act1 boss,sprite,giant bone patriarch skeleton lord with a crown and staff,1:1 magenta key,FORMULA,generate
+boss_plague,act2 boss,sprite,huge plague mother broodmother of boils and tumors,1:1 magenta key,FORMULA,generate
+boss_executioner,act3 boss,sprite,hulking executioner with a hood and colossal cleaver,1:1 magenta key,FORMULA,generate
+boss_abyss,act4 final boss,sprite,winged abyss lord demon with molten cracks,1:1 magenta key,FORMULA,generate
+wpn_axe,weapon overlay+icon,sprite,brutal one-handed battle axe,1:1 magenta key,FORMULA,generate
+wpn_greatsword,weapon overlay+icon,sprite,massive two-handed greatsword,1:1 magenta key,FORMULA,generate
+wpn_bow,weapon overlay+icon,sprite,recurve hunting longbow,1:1 magenta key,FORMULA,generate
+wpn_staff,weapon overlay+icon,sprite,gnarled arcane staff with glowing tip,1:1 magenta key,FORMULA,generate
+wpn_scythe,weapon overlay+icon,sprite,ritual reaper scythe,1:1 magenta key,FORMULA,generate
+wpn_dagger,weapon overlay+icon,sprite,curved sacrificial dagger,1:1 magenta key,FORMULA,generate
+helm_iron,helmet overlay+icon,sprite,horned iron helmet,1:1 magenta key,FORMULA,generate
+shield_tower,shield overlay+icon,sprite,battered kite shield with skull boss,1:1 magenta key,FORMULA,generate
+chest_plate,armor overlay+icon,sprite,scarred steel breastplate armor piece,1:1 magenta key,FORMULA,generate
+chest_robe,armor overlay+icon,sprite,dark occult robe garment,1:1 magenta key,FORMULA,generate
+items_sheet,small item icons 3x3 grid,sprite,3x3 grid of small RPG items: red potion; blue potion; pile of gold coins; iron ring; bone amulet; leather belt; leather boots; leather gloves; ancient tome,1:1 magenta key,FORMULA,generate
+tile_crypt,act1 floor,tile,cracked crypt stone floor slabs with moss,1:1 seamless,FORMULA,generate
+tile_catacomb,act2 floor,tile,catacomb floor of packed earth and embedded bones,1:1 seamless,FORMULA,generate
+tile_torture,act3 floor,tile,bloodstained iron and dark stone dungeon floor,1:1 seamless,FORMULA,generate
+tile_hell,act4 floor,tile,scorched basalt floor with glowing lava cracks,1:1 seamless,FORMULA,generate
+dec_sarcophagus,act1-2 decor obstacle,sprite,cracked stone sarcophagus top-down,1:1 magenta key,FORMULA,generate
+dec_bones,decor,sprite,pile of old bones and a skull,1:1 magenta key,FORMULA,generate
+dec_chest,loot chest,sprite,ancient iron-bound treasure chest,1:1 magenta key,FORMULA,generate
+dec_portal,town/rift portal,sprite,swirling ember-orange ritual portal ring,1:1 magenta key,FORMULA,generate
+title_bg,title screen,background,lone guttering candle before the yawning gates of a dark crypt,16:9,FORMULA,generate
+ui_icons,skill/ui icons,procedural,canvas-drawn rune icons dark parchment + umber outlines per FORMULA,-,FORMULA,procedural
+walls,dungeon walls,procedural,dark stone block walls shaded in code from tile palettes per FORMULA,-,FORMULA,procedural
+audio_all,music+sfx,procedural,WebAudio dark drone ambient + synthesized SFX (credits budget),-,-,procedural

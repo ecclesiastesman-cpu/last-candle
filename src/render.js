@@ -1,5 +1,7 @@
 // Рендер: тайлы, стены, спрайты-марионетки с экипировкой, свет, частицы, числа.
 import { TILE } from './data.js';
+import { STR } from './strings.js';
+const STRN = STR.npc;
 import { T_WALL, T_EXIT, T_ENTRY, isWall } from './world.js';
 import { clamp, lerp, proj, ISOX, ISOY } from './core.js';
 
@@ -126,17 +128,34 @@ export class Renderer {
           ctx.closePath(); ctx.fill();
         }
         if (t === T_EXIT || t === T_ENTRY) {
-          const p = this.assets.dec_portal;
-          const pul = 1 + Math.sin(timeS * 3) * .06;
-          if (p) {
+          // лестницы вниз/вверх (тайлы Flare); фолбэк — портал
+          const sid = this.tilesMeta?.groups?.[t === T_EXIT ? 'stairs_down' : 'stairs_up']?.[0];
+          if (sid === undefined || !this.drawAtlasTile(sid, tx * TILE, ty * TILE)) {
+            const p = this.assets.dec_portal;
+            const pul = 1 + Math.sin(timeS * 3) * .06;
+            if (p) {
+              const [px, py] = proj(tx * TILE + TILE / 2, ty * TILE + TILE / 2);
+              ctx.globalAlpha = t === T_EXIT ? 1 : .45;
+              ctx.save(); ctx.translate(px, py); ctx.scale(1.25, .66);
+              ctx.drawImage(p, -52 * pul, -52 * pul, 104 * pul, 104 * pul);
+              ctx.restore(); ctx.globalAlpha = 1;
+            }
+          } else if (t === T_EXIT) {
+            // подсветка выхода, чтобы читался в темноте
             const [px, py] = proj(tx * TILE + TILE / 2, ty * TILE + TILE / 2);
-            ctx.globalAlpha = t === T_EXIT ? 1 : .45;
-            ctx.save(); ctx.translate(px, py); ctx.scale(1.25, .66);
-            ctx.drawImage(p, -52 * pul, -52 * pul, 104 * pul, 104 * pul);
-            ctx.restore(); ctx.globalAlpha = 1;
+            ctx.save(); ctx.globalAlpha = .18 + Math.sin(timeS * 3) * .07;
+            ctx.fillStyle = '#ffd75e';
+            ctx.beginPath(); ctx.ellipse(px, py, 60, 30, 0, 0, 7); ctx.fill();
+            ctx.restore();
           }
         }
       }
+    }
+    // настильные пропсы: кости, магические круги (лежат на полу, без сортировки по глубине)
+    if (f.propsFloor) for (const p of f.propsFloor) {
+      if (p.tx < x0 || p.tx > x1 || p.ty < y0 || p.ty > y1) continue;
+      const id = this.pickVariant(p.group, p.tx, p.ty);
+      if (id !== null) this.drawAtlasTile(id, p.tx * TILE, p.ty * TILE);
     }
     // декали пола (проецируем и приплюскиваем)
     for (const d of f.decals) {
@@ -172,6 +191,94 @@ export class Renderer {
       this.ctx.fillRect(px - 96, py - 60, 192, 156);
     }
   }
+  // стоячий пропс (гробница, статуя, утварь) — в глубинном проходе
+  drawProp(group, tx, ty) {
+    const id = this.pickVariant(group, tx, ty);
+    if (id !== null) this.drawAtlasTile(id, tx * TILE, ty * TILE);
+  }
+  // костёр лагеря: чаша-тайл уже нарисована как пропс, сверху живое пламя
+  drawCampfire(tx, ty, timeS) {
+    const { ctx } = this;
+    const [px, py] = proj(tx * TILE + TILE / 2, ty * TILE + TILE / 2);
+    const fl = Math.sin(timeS * 12) * .2 + Math.sin(timeS * 27) * .12;
+    ctx.save();
+    ctx.translate(px, py - 46);
+    ctx.globalAlpha = .9;
+    ctx.fillStyle = '#ff9840';
+    ctx.beginPath();
+    ctx.moveTo(-13, 0); ctx.quadraticCurveTo(-15, -26 - fl * 12, 0, -40 - fl * 16);
+    ctx.quadraticCurveTo(15, -26 - fl * 9, 13, 0); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#ffd75e';
+    ctx.beginPath();
+    ctx.moveTo(-7, 0); ctx.quadraticCurveTo(-8, -16 - fl * 7, 0, -25 - fl * 10);
+    ctx.quadraticCurveTo(8, -16 - fl * 6, 7, 0); ctx.closePath(); ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.restore();
+    // искры
+    if (this.particles.length < 280 && Math.random() < .3) {
+      this.particles.push({ x: px + (Math.random() - .5) * 18, y: py - 30, vx: (Math.random() - .5) * 20,
+        vy: -40 - Math.random() * 40, t: .5 + Math.random() * .5, c: '#ffb050', s: 2, grav: -20 });
+    }
+  }
+  // NPC лагеря: спрайт Flare (торговец/хранитель), имя над головой
+  drawNpc(g, n, timeS) {
+    const { ctx } = this;
+    const [px, py] = proj(n.x, n.y);
+    if (n.kind === 'gates' || n.kind === 'ret') {
+      const img = this.assets.dec_portal;
+      if (img) {
+        const pul = 1 + Math.sin(timeS * 2.5) * .07;
+        ctx.save(); ctx.translate(px, py);
+        if (n.kind === 'ret') ctx.filter = 'hue-rotate(160deg)';
+        ctx.scale(1.5, 1.15);
+        ctx.drawImage(img, -55 * pul, -80 * pul, 110 * pul, 110 * pul);
+        ctx.restore(); ctx.filter = 'none';
+      }
+    } else if (n.kind === 'altar') {
+      const id = this.tilesMeta?.groups?.altars?.[0] ?? this.tilesMeta?.groups?.pillar?.[0];
+      if (id !== undefined) this.drawAtlasTile(id, n.x - 32, n.y - 32);
+      ctx.save(); ctx.translate(px, py - 90);
+      ctx.fillStyle = `rgba(255,215,94,${.5 + Math.sin(timeS * 3) * .25})`;
+      ctx.beginPath(); ctx.arc(0, 0, 6 + Math.sin(timeS * 3) * 2, 0, 7); ctx.fill();
+      ctx.restore();
+    } else {
+      // человек: цельный NPC-спрайт Flare; фолбэк — кукла из слоёв
+      const fl = g.flare;
+      ctx.save();
+      ctx.translate(px, py);
+      ctx.fillStyle = 'rgba(0,0,0,0.45)';
+      ctx.beginPath(); ctx.ellipse(0, 5, 20, 8, 0, 0, 7); ctx.fill();
+      ctx.restore();
+      const sheet = n.kind === 'vendor' ? 'n_trader' : 'n_guild';
+      const sm = fl?.meta?.[sheet];
+      const drawn = sm && fl.draw(ctx, sheet, px, py + 5, 'stance', timeS * 1000 + n.x, n.angle ?? Math.PI / 2, 104 / sm.ay);
+      if (!drawn) {
+        const layers = n.kind === 'vendor'
+          ? ['m_default_feet', 'm_default_legs', 'm_default_hands', 'm_cloth_shirt', 'm_head_short']
+          : ['m_default_feet', 'm_default_legs', 'm_default_hands', 'm_leather_chest', 'm_leather_hood'];
+        let scale = null;
+        for (const l of layers) {
+          const m = fl?.meta?.[l];
+          if (!m) continue;
+          if (scale === null) scale = 96 / (fl.meta['m_default_chest']?.ay || m.ay);
+          fl.draw(ctx, l, px, py + 5, 'stance', timeS * 1000 + n.x, n.angle ?? Math.PI / 2, scale);
+        }
+      }
+    }
+    // имя и приглашение
+    const name = ({ vendor: STRN.vendor, keeper: STRN.keeper, altar: STRN.altar, gates: STRN.gates, ret: STRN.ret })[n.kind] || '';
+    ctx.font = 'bold 13px Georgia, serif'; ctx.textAlign = 'center';
+    const ty = py - (n.kind === 'gates' || n.kind === 'ret' ? 110 : n.kind === 'altar' ? 120 : 115);
+    ctx.strokeStyle = 'rgba(0,0,0,0.85)'; ctx.lineWidth = 3;
+    ctx.strokeText(name, px, ty);
+    ctx.fillStyle = '#ffd75e'; ctx.fillText(name, px, ty);
+    if (g.nearNpc === n || (n.kind === 'ret' && g.nearReturn)) {
+      ctx.strokeStyle = `rgba(255,215,94,${.5 + Math.sin(timeS * 5) * .3})`;
+      ctx.lineWidth = 2.5;
+      ctx.beginPath(); ctx.ellipse(px, py + 5, 34, 15, 0, 0, 7); ctx.stroke();
+    }
+  }
+
   // стоячая жаровня с живым пламенем
   drawBrazier(wx, wy, timeS) {
     const { ctx } = this;
@@ -341,11 +448,13 @@ export class Renderer {
       const [dpx, dpyRaw] = proj(d.x, d.y);
       const y = dpyRaw - bounce;
       if (d.kind === 'gold') {
-        ctx.fillStyle = '#ffd75e'; ctx.beginPath(); ctx.arc(dpx, y, 5, 0, 7); ctx.fill();
-        ctx.fillStyle = '#a67c00'; ctx.fillRect(dpx - 3, y - 1, 6, 2);
+        const gi = this.assets['loot/coins'];
+        if (gi) ctx.drawImage(gi, dpx - 11, y - 14, 22, 22);
+        else { ctx.fillStyle = '#ffd75e'; ctx.beginPath(); ctx.arc(dpx, y, 5, 0, 7); ctx.fill(); }
       } else if (d.kind === 'potion') {
-        ctx.fillStyle = '#c62828'; ctx.beginPath(); ctx.arc(dpx, y, 6, 0, 7); ctx.fill();
-        ctx.fillStyle = '#8d6e63'; ctx.fillRect(dpx - 2, y - 10, 4, 5);
+        const pi = this.assets['loot/hp_flask'];
+        if (pi) ctx.drawImage(pi, dpx - 12, y - 16, 24, 24);
+        else { ctx.fillStyle = '#c62828'; ctx.beginPath(); ctx.arc(dpx, y, 6, 0, 7); ctx.fill(); }
       } else {
         const col = ({ common: '#c8c2b8', magic: '#7aa9ff', rare: '#ffd75e', set: '#61d97a', unique: '#ff9840' })[d.item.rarity];
         ctx.save();
@@ -445,11 +554,18 @@ export class Renderer {
     };
     const flick = 1 + Math.sin(timeS * 11) * .04 + Math.sin(timeS * 23) * .02;
     put(g.hero.x, g.hero.y, g.stats.lightRadius * flick, 1);
+    const fires = []; // экранные позиции огней для тёплого свечения
     for (const t of g.floor.torches) {
       const wx = t.x * TILE + TILE / 2, wy = t.y * TILE + TILE / 2;
       const [tpx, tpy] = proj(wx, wy);
       if (Math.abs(tpx - this.cam.px) > innerWidth * 1.2 || Math.abs(tpy - this.cam.py) > innerHeight * 1.2) continue;
       put(wx, wy, 190 * flick, .85);
+      fires.push([wx, wy, 120]);
+    }
+    if (g.floor.campfire) {
+      const wx = g.floor.campfire.tx * TILE + TILE / 2, wy = g.floor.campfire.ty * TILE + TILE / 2;
+      put(wx, wy, 300 * flick, .95);
+      fires.push([wx, wy, 210]);
     }
     for (const p of g.projectiles) if (p.color && !p.arrow) put(p.x, p.y, 60, .7);
     for (const z2 of g.zones) put(z2.x, z2.y, z2.r * 1.2, .5);
@@ -458,6 +574,21 @@ export class Renderer {
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     ctx.imageSmoothingEnabled = true;
     ctx.drawImage(lc, 0, 0, innerWidth, innerHeight);
+    // тёплое аддитивное свечение вокруг огня — оживляет картинку
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    for (const [wx, wy, r] of fires) {
+      const [sx, sy] = this.worldToScreen(wx, wy);
+      const rr = r * this.zoom * flick;
+      if (!isFinite(sx + sy + rr)) continue;
+      const grad = ctx.createRadialGradient(sx, sy - 20 * this.zoom, 0, sx, sy - 20 * this.zoom, rr);
+      grad.addColorStop(0, 'rgba(255,140,50,0.16)');
+      grad.addColorStop(.5, 'rgba(255,100,30,0.07)');
+      grad.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = grad;
+      ctx.fillRect(sx - rr, sy - 20 * this.zoom - rr, rr * 2, rr * 2);
+    }
+    ctx.restore();
   }
 
   // ---- fx API (вызывается геймплеем через g.fx) ----

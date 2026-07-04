@@ -2,10 +2,10 @@
 import { STR } from './strings.js';
 import { TILE, CLASSES, SKILLS, ACTS, MOBS, XP_CURVE, POTION_HEAL, DEATH_GOLD_LOSS, RARITY } from './data.js';
 import { makeRng, Input, bus, clamp, dist2, proj, unprojDir, isoAngle } from './core.js';
-import { genFloor, collide, T_EXIT } from './world.js';
+import { genFloor, genTown, collide, T_EXIT } from './world.js';
 import { makeMob, updateMob, damageMob, damageHero, healHero, gainXp } from './entities.js';
 import { useSkill, basicAttack, autoAim, canUse } from './skills.js';
-import { makeItem, computeStats, newUid, setUidBase } from './items.js';
+import { makeItem, computeStats, newUid, setUidBase, refreshIcon } from './items.js';
 import { SETS } from './data.js';
 import { Renderer } from './render.js';
 import { UI } from './ui.js';
@@ -22,6 +22,13 @@ const ASSET_LIST = [
   'item_potion', 'item_potion2', 'item_gold', 'item_ring', 'item_amulet', 'item_belt', 'item_boots', 'item_gloves', 'item_tome',
   'tile_crypt', 'tile_catacomb', 'tile_torture', 'tile_hell',
   'dec_sarcophagus', 'dec_bones', 'dec_chest', 'dec_portal', 'title_bg',
+  // рисованные иконки предметов (лист Flare icons.png)
+  ...['hand_axe', 'battle_axe', 'great_axe', 'greatsword', 'sword', 'shortbow', 'longbow', 'greatbow',
+    'staff', 'wand', 'greatstaff', 'skull_staff', 'dagger', 'buckler', 'kite_shield', 'crest_shield', 'book2',
+    'leather_hood', 'chain_coif', 'plate_helm', 'leather_armor', 'chain_mail', 'plate_armor', 'mage_vest',
+    'leather_gloves', 'chain_gloves', 'plate_gloves', 'belt2', 'leather_boots', 'chain_boots', 'plate_boots',
+    'amu_green', 'amu_red', 'amu_blue', 'ring_silver', 'ring_gold', 'ring_ruby',
+    'coins', 'hp_flask', 'gem_red'].map(n => 'loot/' + n),
 ];
 
 class Game {
@@ -117,13 +124,13 @@ class Game {
     if (!d) return;
     this.sound.ensure(); this.sound.resume();
     this.restore(d);
-    this.state = 'town'; this.restockVendor(); this.ui.open('town');
+    this.restockVendor(); this.enterTown();
   }
   doNewGame(cls) {
     this.sound.ensure(); this.sound.resume();
     wipeSave();
     this.newHero(cls);
-    this.state = 'town'; this.restockVendor(); this.ui.open('town');
+    this.restockVendor(); this.enterTown();
   }
   recalc() {
     this.cls = CLASSES[this.hero.cls];
@@ -148,6 +155,10 @@ class Game {
       attackT: 0, hurtT: 0, invulnT: 0, animT: 0, dead: false, slowT: 0, hp: 1, res: 0,
     }, d.hero);
     this.stash = d.stash || [];
+    // старые сейвы: перевести иконки предметов на новые листы
+    for (const it of this.hero.inventory || []) refreshIcon(it);
+    for (const sl in this.hero.equip) refreshIcon(this.hero.equip[sl]);
+    for (const it of this.stash) refreshIcon(it);
     this.progress = d.progress;
     this.settings = Object.assign(this.settings, d.settings);
     this.seedBase = d.seedBase;
@@ -173,13 +184,61 @@ class Game {
     }
   }
 
+  // ---------- ЛАГЕРЬ ----------
+  enterTown() {
+    if (this.ui) this.ui.closeScreen();
+    this.floor = genTown();
+    this.actData = { tiles: 'tile_crypt', fog: '#060503', wall: '#1a1d24', mobs: [], decor: [], mobLvl: [1, 1] };
+    const h = this.hero;
+    h.x = this.floor.entry.cx * TILE + TILE / 2;
+    h.y = this.floor.entry.cy * TILE + TILE / 2;
+    h.dead = false; h.deadT = 0;
+    this.mobs = []; this.projectiles = []; this.zones = []; this.traps = []; this.drops = []; this.corpses = [];
+    this.chestObjs = [];
+    this.townMode = true;
+    this.rebuildHeroSheet();
+    if (this.flare?.meta) this.flare.preload(['n_trader', 'n_guild', 'm_default_feet', 'm_default_legs', 'm_default_hands', 'm_head_short', 'm_cloth_shirt', 'm_leather_chest', 'm_leather_hood']);
+    const [cpx, cpy] = proj(h.x, h.y);
+    this.renderer.cam.px = cpx; this.renderer.cam.py = cpy;
+    this.state = 'dungeon';
+    this.hero.potionCharges = Math.max(this.hero.potionCharges, Math.min(this.stats.potions, 3));
+    this.save();
+  }
+  // городской портал: сохранить контекст подземелья и вернуться точно назад
+  castTownPortal() {
+    if (this.townMode) return;
+    this.dungeonCtx = {
+      floor: this.floor, actData: this.actData, mobs: this.mobs, projectiles: [],
+      zones: this.zones, traps: this.traps, drops: this.drops, corpses: this.corpses,
+      chestObjs: this.chestObjs, mobLvl: this.mobLvl, x: this.hero.x, y: this.hero.y,
+    };
+    bus.emit('portal');
+    this.enterTown();
+  }
+  returnFromTown() {
+    const c = this.dungeonCtx;
+    if (!c) return;
+    this.floor = c.floor; this.actData = c.actData; this.mobs = c.mobs;
+    this.projectiles = []; this.zones = c.zones; this.traps = c.traps;
+    this.drops = c.drops; this.corpses = c.corpses; this.chestObjs = c.chestObjs; this.mobLvl = c.mobLvl;
+    this.hero.x = c.x; this.hero.y = c.y;
+    this.townMode = false;
+    this.dungeonCtx = null;
+    const [cpx, cpy] = proj(this.hero.x, this.hero.y);
+    this.renderer.cam.px = cpx; this.renderer.cam.py = cpy;
+    bus.emit('portal');
+    this.state = 'dungeon';
+  }
+
   // ---------- УРОВНИ ----------
   enterAct(act) {
     this.progress.act = act; this.progress.floor = 1; this.progress.rift = false;
+    this.townMode = false; this.dungeonCtx = null;
     this.loadFloor();
   }
   enterRift() {
     this.progress.rift = true;
+    this.townMode = false; this.dungeonCtx = null;
     this.loadFloor();
   }
   loadFloor() {
@@ -249,8 +308,9 @@ class Game {
         this.ui.toast(STR.gameCleared, '#ffd75e');
       }
       p.floor = 1;
+      this.dungeonCtx = null;
       this.save();
-      this.state = 'town'; this.ui.open('town'); this.restockVendor();
+      this.restockVendor(); this.enterTown();
     }, 1600);
   }
   onDeath() {
@@ -265,7 +325,8 @@ class Game {
     this.recalc();
     this.hero.hp = this.stats.maxHp; this.hero.res = this.stats.maxRes * .5;
     this.hero.potionCharges = this.stats.potions;
-    this.state = 'town'; this.ui.open('town'); this.restockVendor();
+    this.dungeonCtx = null;
+    this.restockVendor(); this.enterTown();
   }
 
   // ---------- ПРЕДМЕТЫ ----------
@@ -289,8 +350,13 @@ class Game {
     this.rebuildHeroSheet();
     this.hero.potionCharges = Math.min(this.hero.potionCharges, this.stats.potions);
   }
-  unequipItem(slot) {
+  unequipItem(slotOrId) {
     const h = this.hero;
+    let slot = slotOrId;
+    if (!h.equip[slot]) { // пришёл id предмета — найдём его слот
+      slot = Object.keys(h.equip).find(sl => h.equip[sl] && String(h.equip[sl].id) === String(slotOrId));
+      if (!slot) return;
+    }
     const it = h.equip[slot];
     if (!it || h.inventory.length >= 24) return;
     h.equip[slot] = null; h.inventory.push(it); this.recalc(); this.rebuildHeroSheet();
@@ -355,16 +421,45 @@ class Game {
       h.x = nx; h.y = ny;
     }
     if (h.slowT > 0) h.slowT -= dt;
-    // атака/умения: правый стик задаёт направление удара, иначе автоприцел
-    let ax, ay;
-    if (cmds.aimX !== undefined) {
-      const [wx, wy] = unprojDir(cmds.aimX, cmds.aimY);
-      ax = h.x + wx * 220; ay = h.y + wy * 220;
-    }
-    else [ax, ay] = autoAim(this);
-    if (cmds.attack) basicAttack(this, ax, ay);
-    for (let i = 0; i < 4; i++) {
-      if (cmds['skill' + (i + 1)] && h.skillBar[i]) useSkill(this, h.skillBar[i], ax, ay);
+    // город: взаимодействие с NPC, боя нет
+    if (this.townMode) {
+      this.nearNpc = null;
+      for (const n of this.floor.npcs) {
+        if (dist2(n.x, n.y, h.x, h.y) < 85 * 85) { this.nearNpc = n; break; }
+      }
+      // возвратный портал
+      this.nearReturn = this.dungeonCtx && dist2(this.floor.entry.cx * TILE + TILE, this.floor.entry.cy * TILE + 2.2 * TILE, h.x, h.y) < 80 * 80;
+      const openNpc = n => {
+        if (n.kind === 'vendor') this.ui.open('vendor');
+        else if (n.kind === 'keeper') this.ui.open('stash');
+        else if (n.kind === 'altar') this.ui.open('talents');
+        else if (n.kind === 'gates') this.ui.open('portals');
+      };
+      if (cmds.once.has('interact') || cmds.once.has('attack')) {
+        if (this.nearReturn) this.returnFromTown();
+        else if (this.nearNpc) openNpc(this.nearNpc);
+      }
+      if (cmds.tap) {
+        const [wx, wy] = this.renderer.screenToWorld(cmds.tap.x, cmds.tap.y);
+        for (const n of this.floor.npcs) {
+          if (dist2(n.x, n.y, wx, wy) < 70 * 70 && dist2(n.x, n.y, h.x, h.y) < 130 * 130) { openNpc(n); break; }
+        }
+        if (this.dungeonCtx && dist2(this.floor.entry.cx * TILE + TILE, this.floor.entry.cy * TILE + 2.2 * TILE, wx, wy) < 70 * 70
+          && this.nearReturn) this.returnFromTown();
+      }
+    } else {
+      // атака/умения: правый стик задаёт направление удара, иначе автоприцел
+      let ax, ay;
+      if (cmds.aimX !== undefined) {
+        const [wx, wy] = unprojDir(cmds.aimX, cmds.aimY);
+        ax = h.x + wx * 220; ay = h.y + wy * 220;
+      }
+      else [ax, ay] = autoAim(this);
+      if (cmds.attack) basicAttack(this, ax, ay);
+      for (let i = 0; i < 4; i++) {
+        if (cmds['skill' + (i + 1)] && h.skillBar[i]) useSkill(this, h.skillBar[i], ax, ay);
+      }
+      if (cmds.once.has('townportal')) this.castTownPortal();
     }
     if (cmds.once.has('potion')) this.drinkPotion();
     if (cmds.once.has('inventory')) this.ui.open('inventory');
@@ -488,6 +583,7 @@ class Game {
       }
     }
     // выход с этажа
+    if (this.townMode) { /* врата обрабатываются как NPC */ }
     const ex = this.floor.exit;
     if (!this.floor.isBossFloor || this.mobs.every(m => !m.boss || m.dead)) {
       if (dist2(h.x, h.y, ex.cx * TILE + TILE / 2, ex.cy * TILE + TILE / 2) < 40 * 40) {
@@ -562,9 +658,14 @@ class Game {
     const f = this.floor;
     for (let ty = vy0; ty <= vy1; ty++) {
       for (let tx = vx0; tx <= vx1; tx++) {
-        if (f.g[ty * f.W + tx] !== 0) continue;
-        // рисуем только стены, видимые с пола
-        list.push({ kind: 'wall', tx, ty, key: (tx + ty + 1.6) * TILE });
+        const idx = ty * f.W + tx;
+        if (f.g[idx] === 0) { list.push({ kind: 'wall', tx, ty, key: (tx + ty + 1.6) * TILE }); continue; }
+        const pg = f.propAt?.get(idx);
+        if (pg) {
+          if (f.campfire && f.campfire.tx === tx && f.campfire.ty === ty)
+            list.push({ kind: 'campfire', tx, ty, key: (tx + ty + 1.2) * TILE });
+          else list.push({ kind: 'prop', pg, tx, ty, key: (tx + ty + 1.2) * TILE });
+        }
       }
     }
     for (const t of f.torches) {
@@ -579,6 +680,10 @@ class Game {
     }
     for (const c of this.chestObjs) {
       list.push({ kind: 'chest', c, key: c.x + c.y });
+    }
+    if (f.npcs) for (const n of f.npcs) list.push({ kind: 'npc', n, key: n.x + n.y });
+    if (this.townMode && this.dungeonCtx) {
+      list.push({ kind: 'npc', n: { kind: 'ret', x: f.entry.cx * TILE + TILE, y: f.entry.cy * TILE + 2.2 * TILE }, key: f.entry.cx * TILE + TILE + f.entry.cy * TILE + 2.2 * TILE });
     }
     for (const m of this.mobs) {
       if (m.dead) continue;
@@ -598,16 +703,29 @@ class Game {
           r.ctx.save(); r.ctx.translate(px, py); r.ctx.scale(1.4, .8);
           r.ctx.drawImage(img, -42, -42, 84, 84); r.ctx.restore();
         }
-      } else if (e.kind === 'chest') {
-        const img = this.assets.dec_chest;
-        if (img) {
-          const [px, py] = proj(e.c.x, e.c.y);
-          r.ctx.globalAlpha = e.c.opened ? .45 : 1;
-          r.ctx.save(); r.ctx.translate(px, py); r.ctx.scale(1.2, .85);
-          r.ctx.drawImage(img, -30, -46, 60, 60); r.ctx.restore();
-          r.ctx.globalAlpha = 1;
+      } else if (e.kind === 'prop') r.drawProp(e.pg, e.tx, e.ty);
+      else if (e.kind === 'campfire') { r.drawProp('firepit', e.tx, e.ty); r.drawCampfire(e.tx, e.ty, timeS); }
+      else if (e.kind === 'chest') {
+        // тайл-сундук: акты 1-2 обычный, 3-4 демонический
+        const grp = f.act >= 3 ? (e.c.opened ? 'chest_d_open' : 'chest_d') : (e.c.opened ? 'chest_open' : 'chest');
+        const id = r.tilesMeta?.groups?.[grp]?.[0];
+        const ctx2 = r.ctx;
+        if (id !== undefined && r.tilesImg) {
+          if (e.c.opened) ctx2.globalAlpha = .8;
+          r.drawAtlasTile(id, e.c.x - TILE / 2, e.c.y - TILE / 2);
+          ctx2.globalAlpha = 1;
+        } else {
+          const img = this.assets.dec_chest;
+          if (img) {
+            const [px, py] = proj(e.c.x, e.c.y);
+            ctx2.globalAlpha = e.c.opened ? .45 : 1;
+            ctx2.save(); ctx2.translate(px, py); ctx2.scale(1.2, .85);
+            ctx2.drawImage(img, -30, -46, 60, 60); ctx2.restore();
+            ctx2.globalAlpha = 1;
+          }
         }
-      } else if (e.kind === 'mob') r.drawMob(this, e.m, timeS);
+      } else if (e.kind === 'npc') r.drawNpc(this, e.n, timeS);
+      else if (e.kind === 'mob') r.drawMob(this, e.m, timeS);
       else r.drawHero(this, timeS);
     }
     r.drawEffects(this, 1 / 60, timeS);

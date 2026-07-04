@@ -7,6 +7,13 @@ export const setUidBase = v => { uid = Math.max(uid, v); };
 
 const AFF_BY_ID = Object.fromEntries(AFFIXES.map(a => [a[0], a]));
 
+// иконка с тиром по ilvl; refreshIcon чинит предметы из старых сейвов
+const iconFor = (b, ilvl) => b.iconT ? b.iconT[ilvl < 9 ? 0 : ilvl < 20 ? 1 : 2] : b.icon;
+export function refreshIcon(it) {
+  const b = it && BASE_ITEMS[it.base];
+  if (b) it.icon = iconFor(b, it.ilvl || 1);
+}
+
 export function rollAffix(rng, slot, ilvl, exclude) {
   const pool = AFFIXES.filter(a => (!a[1] || a[1].includes(slot) || (slot.startsWith('ring') && a[1].includes('ring'))) && !exclude.has(a[0]));
   if (!pool.length) return null;
@@ -71,7 +78,7 @@ export function makeItem(rng, ilvl, opts = {}) {
 
   function finalize(it) {
     const b = BASE_ITEMS[it.base];
-    it.id = newUid(); it.slot = b.slot; it.icon = b.icon;
+    it.id = newUid(); it.slot = b.slot; it.icon = iconFor(b, it.ilvl);
     if (b.dmg) { const s = 1 + it.ilvl * .14; it.dmg = [Math.round(b.dmg[0] * s), Math.round(b.dmg[1] * s)]; it.aspd = b.aspd; }
     if (b.armor) it.armor = Math.round(b.armor * (1 + it.ilvl * .11));
     if (b.block) it.block = b.block;

@@ -1,12 +1,19 @@
 // Service Worker: полный прекэш — игра работает без сети после первого открытия.
-const VERSION = 'lastcandle-v4';
+const VERSION = 'lastcandle-v8';
 const CORE = [
   './', './index.html', './manifest.webmanifest',
   './src/main.js', './src/core.js', './src/data.js', './src/strings.js', './src/items.js',
   './src/world.js', './src/entities.js', './src/skills.js', './src/render.js', './src/ui.js',
   './src/audio.js', './src/save.js', './src/flare.js', './assets/flare/meta.json', './assets/flare/tiles.webp',
 ];
+const LOOT = ['hand_axe', 'battle_axe', 'great_axe', 'greatsword', 'sword', 'shortbow', 'longbow', 'greatbow',
+  'staff', 'wand', 'greatstaff', 'skull_staff', 'dagger', 'buckler', 'kite_shield', 'crest_shield', 'book2',
+  'leather_hood', 'chain_coif', 'plate_helm', 'leather_armor', 'chain_mail', 'plate_armor', 'mage_vest',
+  'leather_gloves', 'chain_gloves', 'plate_gloves', 'belt2', 'leather_boots', 'chain_boots', 'plate_boots',
+  'amu_green', 'amu_red', 'amu_blue', 'ring_silver', 'ring_gold', 'ring_ruby',
+  'coins', 'hp_flask', 'gem_red'].map(n => './assets/loot/' + n + '.webp');
 const FLARE = ['e_skeleton', 'e_skeleton_mage', 'e_zombie', 'e_goblin', 'e_antlion', 'e_minotaur', 'e_wyvern',
+  'n_trader', 'n_guild',
   'm_default_feet', 'm_default_legs', 'm_default_hands', 'm_default_chest', 'm_head_short',
   'm_cloth_shirt', 'm_leather_chest', 'm_chain_cuirass', 'm_plate_cuirass', 'm_mage_vest',
   'm_leather_hood', 'm_chain_coif', 'm_plate_helm', 'm_buckler', 'm_kite_shield',
@@ -31,7 +38,7 @@ self.addEventListener('install', e => {
     const cache = await caches.open(VERSION);
     // ядро обязано закэшироваться; ассеты — сколько получится (отсутствующие не валят установку)
     await cache.addAll(CORE);
-    await Promise.allSettled([...ASSETS, ...FLARE].map(u => cache.add(u)));
+    await Promise.allSettled([...ASSETS, ...FLARE, ...LOOT].map(u => cache.add(u)));
     self.skipWaiting();
   })());
 });

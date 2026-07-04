@@ -125,23 +125,24 @@ export const ELITE_MODS = {
 };
 
 // ---- ПРЕДМЕТЫ ----
+// icon — базовая иконка; iconT — тиры по ilvl (<9, <20, 20+)
 export const BASE_ITEMS = {
-  axe:      { slot: 'weapon', icon: 'wpn_axe', dmg: [7, 12], aspd: 1.1, cls: null, name: 'Топор' },
-  sword2h:  { slot: 'weapon', icon: 'wpn_greatsword', dmg: [13, 22], aspd: .8, twoHand: true, name: 'Двуручный меч' },
-  bow:      { slot: 'weapon', icon: 'wpn_bow', dmg: [6, 11], aspd: 1.25, ranged: true, twoHand: true, name: 'Лук' },
-  staff:    { slot: 'weapon', icon: 'wpn_staff', dmg: [8, 14], aspd: .95, caster: true, name: 'Посох' },
-  scythe:   { slot: 'weapon', icon: 'wpn_scythe', dmg: [9, 16], aspd: .9, caster: true, name: 'Коса' },
-  dagger:   { slot: 'weapon', icon: 'wpn_dagger', dmg: [4, 8], aspd: 1.5, name: 'Кинжал' },
-  shield:   { slot: 'offhand', icon: 'shield_tower', armor: 14, block: 12, name: 'Щит' },
-  tome:     { slot: 'offhand', icon: 'item_tome', armor: 2, caster: true, spellDmg: .1, name: 'Гримуар' },
-  helm:     { slot: 'helm', icon: 'helm_iron', armor: 8, name: 'Шлем' },
-  plate:    { slot: 'chest', icon: 'chest_plate', armor: 18, name: 'Латы' },
-  robe:     { slot: 'chest', icon: 'chest_robe', armor: 7, caster: true, spellDmg: .08, name: 'Роба' },
-  gloves:   { slot: 'gloves', icon: 'item_gloves', armor: 5, name: 'Перчатки' },
-  belt:     { slot: 'belt', icon: 'item_belt', armor: 4, potions: 1, name: 'Пояс' },
-  boots:    { slot: 'boots', icon: 'item_boots', armor: 5, name: 'Сапоги' },
-  amulet:   { slot: 'amulet', icon: 'item_amulet', name: 'Амулет' },
-  ring:     { slot: 'ring', icon: 'item_ring', name: 'Кольцо' },
+  axe:      { slot: 'weapon', icon: 'loot/battle_axe', iconT: ['loot/hand_axe', 'loot/battle_axe', 'loot/great_axe'], dmg: [7, 12], aspd: 1.1, cls: null, name: 'Топор' },
+  sword2h:  { slot: 'weapon', icon: 'loot/greatsword', dmg: [13, 22], aspd: .8, twoHand: true, name: 'Двуручный меч' },
+  bow:      { slot: 'weapon', icon: 'loot/longbow', iconT: ['loot/shortbow', 'loot/longbow', 'loot/greatbow'], dmg: [6, 11], aspd: 1.25, ranged: true, twoHand: true, name: 'Лук' },
+  staff:    { slot: 'weapon', icon: 'loot/staff', iconT: ['loot/staff', 'loot/wand', 'loot/greatstaff'], dmg: [8, 14], aspd: .95, caster: true, name: 'Посох' },
+  scythe:   { slot: 'weapon', icon: 'loot/skull_staff', dmg: [9, 16], aspd: .9, caster: true, name: 'Коса' },
+  dagger:   { slot: 'weapon', icon: 'loot/dagger', iconT: ['loot/dagger', 'loot/dagger', 'loot/sword'], dmg: [4, 8], aspd: 1.5, name: 'Кинжал' },
+  shield:   { slot: 'offhand', icon: 'loot/kite_shield', iconT: ['loot/buckler', 'loot/kite_shield', 'loot/crest_shield'], armor: 14, block: 12, name: 'Щит' },
+  tome:     { slot: 'offhand', icon: 'loot/book2', armor: 2, caster: true, spellDmg: .1, name: 'Гримуар' },
+  helm:     { slot: 'helm', icon: 'loot/plate_helm', iconT: ['loot/leather_hood', 'loot/chain_coif', 'loot/plate_helm'], armor: 8, name: 'Шлем' },
+  plate:    { slot: 'chest', icon: 'loot/plate_armor', iconT: ['loot/leather_armor', 'loot/chain_mail', 'loot/plate_armor'], armor: 18, name: 'Латы' },
+  robe:     { slot: 'chest', icon: 'loot/mage_vest', armor: 7, caster: true, spellDmg: .08, name: 'Роба' },
+  gloves:   { slot: 'gloves', icon: 'loot/plate_gloves', iconT: ['loot/leather_gloves', 'loot/chain_gloves', 'loot/plate_gloves'], armor: 5, name: 'Перчатки' },
+  belt:     { slot: 'belt', icon: 'loot/belt2', armor: 4, potions: 1, name: 'Пояс' },
+  boots:    { slot: 'boots', icon: 'loot/plate_boots', iconT: ['loot/leather_boots', 'loot/chain_boots', 'loot/plate_boots'], armor: 5, name: 'Сапоги' },
+  amulet:   { slot: 'amulet', icon: 'loot/amu_red', iconT: ['loot/amu_green', 'loot/amu_red', 'loot/amu_blue'], name: 'Амулет' },
+  ring:     { slot: 'ring', icon: 'loot/ring_gold', iconT: ['loot/ring_silver', 'loot/ring_gold', 'loot/ring_ruby'], name: 'Кольцо' },
 };
 
 // Аффиксы: [id, слоты|null=все, стат, мин..макс за ур.1, рост/ур, префикс?, имя]
