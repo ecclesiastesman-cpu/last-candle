@@ -1,7 +1,7 @@
 // Точка входа: состояния (титул/выбор класса/лагерь/подземелье), игровой цикл.
 import { STR } from './strings.js';
 import { TILE, CLASSES, SKILLS, ACTS, MOBS, XP_CURVE, POTION_HEAL, DEATH_GOLD_LOSS, RARITY } from './data.js';
-import { makeRng, Input, bus, clamp, dist2 } from './core.js';
+import { makeRng, Input, bus, clamp, dist2, proj, unprojDir, isoAngle } from './core.js';
 import { genFloor, collide, T_EXIT } from './world.js';
 import { makeMob, updateMob, damageMob, damageHero, healHero, gainXp } from './entities.js';
 import { useSkill, basicAttack, autoAim, canUse } from './skills.js';
@@ -53,6 +53,12 @@ class Game {
     }));
     await Promise.all(jobs);
     await flareReady;
+    // атлас тайлсета подземелья
+    this.tilesImg = await new Promise(res => {
+      const img = new Image();
+      img.onload = () => res(img); img.onerror = () => res(null);
+      img.src = './assets/flare/tiles.webp';
+    });
   }
   rebuildHeroSheet() {
     if (!this.hero || !this.flare?.meta) return;
@@ -62,6 +68,8 @@ class Game {
   }
   start() {
     this.renderer = new Renderer(this.canvas, this.assets);
+    this.renderer.tilesImg = this.tilesImg;
+    this.renderer.tilesMeta = this.flare?.meta?.__tiles || null;
     this.fx = this.renderer.fxApi();
     this.ui = new UI(this);
     addEventListener('resize', () => this.renderer.resize());
@@ -215,6 +223,8 @@ class Game {
     }
     // сундуки как "монстры"-объекты попроще: массив
     this.chestObjs = this.floor.chests.map(c => ({ x: c.x * TILE + TILE / 2, y: c.y * TILE + TILE / 2, opened: false }));
+    const [cpx, cpy] = proj(h.x, h.y);
+    this.renderer.cam.px = cpx; this.renderer.cam.py = cpy;
     this.state = 'dungeon';
     bus.emit('portal');
     this.save();
@@ -336,17 +346,21 @@ class Game {
     h.moving = ml > .05;
     if (h.moving) {
       if (ml > 1) { mx /= ml; my /= ml; }
-      h.faceX = mx; h.faceY = my;
-      if (!h.action) h.faceAngle = Math.atan2(my, mx);
+      if (!h.action) h.faceAngle = Math.atan2(my, mx); // экранный угол стика
       if (mx) h.dir = mx < 0 ? -1 : 1;
-      const sp = s.moveSpeed * (h.slowT > 0 ? .5 : 1);
-      const [nx, ny] = collide(this.floor, h.x + mx * sp * dt, h.y + my * sp * dt, h.r);
+      const [wx, wy] = unprojDir(mx, my); // экран -> мир
+      h.faceX = wx; h.faceY = wy;
+      const sp = s.moveSpeed * (h.slowT > 0 ? .5 : 1) * ml;
+      const [nx, ny] = collide(this.floor, h.x + wx * sp * dt, h.y + wy * sp * dt, h.r);
       h.x = nx; h.y = ny;
     }
     if (h.slowT > 0) h.slowT -= dt;
     // атака/умения: правый стик задаёт направление удара, иначе автоприцел
     let ax, ay;
-    if (cmds.aimX !== undefined) { ax = h.x + cmds.aimX * 220; ay = h.y + cmds.aimY * 220; }
+    if (cmds.aimX !== undefined) {
+      const [wx, wy] = unprojDir(cmds.aimX, cmds.aimY);
+      ax = h.x + wx * 220; ay = h.y + wy * 220;
+    }
     else [ax, ay] = autoAim(this);
     if (cmds.attack) basicAttack(this, ax, ay);
     for (let i = 0; i < 4; i++) {
@@ -487,10 +501,11 @@ class Game {
         for (let tx = Math.max(0, htx - 4); tx <= Math.min(f.W - 1, htx + 4); tx++)
           f.visited[ty * f.W + tx] = 1;
     }
-    // камера
+    // камера (в проекционных координатах)
     const cam = this.renderer.cam;
-    cam.x += (h.x - cam.x) * Math.min(1, dt * 7);
-    cam.y += (h.y - cam.y) * Math.min(1, dt * 7);
+    const [hpx, hpy] = proj(h.x, h.y);
+    cam.px = (cam.px ?? hpx) + (hpx - (cam.px ?? hpx)) * Math.min(1, dt * 7);
+    cam.py = (cam.py ?? hpy) + (hpy - (cam.py ?? hpy)) * Math.min(1, dt * 7);
   }
   drinkPotion() {
     const h = this.hero, s = this.stats;
@@ -539,26 +554,62 @@ class Game {
     }
     // dungeon
     r.drawFloor(this, timeS);
-    // декор
-    for (const d of this.floor.decor) {
-      const img = this.assets[this.actData.decor[d.kind] || 'dec_bones'];
-      if (img) r.ctx.drawImage(img, d.x * TILE - 6, d.y * TILE - 30, 76, 76);
-    }
-    for (const c of this.chestObjs) {
-      const img = this.assets.dec_chest;
-      if (img) { r.ctx.globalAlpha = c.opened ? .45 : 1; r.ctx.drawImage(img, c.x - 30, c.y - 42, 60, 60); r.ctx.globalAlpha = 1; }
-    }
     r.drawCorpses(this);
     r.drawDrops(this, timeS);
-    // сортировка по y для глубины (мобы + герой)
-    const drawList = this.mobs.filter(m => !m.dead && Math.abs(m.x - r.cam.x) < innerWidth && Math.abs(m.y - r.cam.y) < innerHeight);
-    drawList.sort((a, b) => a.y - b.y);
-    let heroDrawn = false;
-    for (const m of drawList) {
-      if (!heroDrawn && m.y > this.hero.y) { r.drawHero(this, timeS); heroDrawn = true; }
-      r.drawMob(this, m, timeS);
+    // глубинный проход: стены-блоки + жаровни + декор + сундуки + мобы + герой, сортировка по (x+y)
+    const [vx0, vx1, vy0, vy1] = r.visRange || [0, 0, 0, 0];
+    const list = [];
+    const f = this.floor;
+    for (let ty = vy0; ty <= vy1; ty++) {
+      for (let tx = vx0; tx <= vx1; tx++) {
+        if (f.g[ty * f.W + tx] !== 0) continue;
+        // рисуем только стены, видимые с пола
+        list.push({ kind: 'wall', tx, ty, key: (tx + ty + 1.6) * TILE });
+      }
     }
-    if (!heroDrawn) r.drawHero(this, timeS);
+    for (const t of f.torches) {
+      const wx = t.x * TILE + TILE / 2, wy = t.y * TILE + TILE / 2;
+      if (t.x < vx0 || t.x > vx1 || t.y < vy0 || t.y > vy1) continue;
+      list.push({ kind: 'brazier', x: wx, y: wy, key: wx + wy });
+    }
+    for (const d of f.decor) {
+      const wx = d.x * TILE + TILE / 2, wy = d.y * TILE + TILE / 2;
+      if (d.x < vx0 || d.x > vx1 || d.y < vy0 || d.y > vy1) continue;
+      list.push({ kind: 'decor', d, x: wx, y: wy, key: wx + wy });
+    }
+    for (const c of this.chestObjs) {
+      list.push({ kind: 'chest', c, key: c.x + c.y });
+    }
+    for (const m of this.mobs) {
+      if (m.dead) continue;
+      const [mpx, mpy] = proj(m.x, m.y);
+      if (Math.abs(mpx - r.cam.px) > innerWidth || Math.abs(mpy - r.cam.py) > innerHeight) continue;
+      list.push({ kind: 'mob', m, key: m.x + m.y });
+    }
+    list.push({ kind: 'hero', key: this.hero.x + this.hero.y });
+    list.sort((a, b) => a.key - b.key);
+    for (const e of list) {
+      if (e.kind === 'wall') r.drawWallCell(this, e.tx, e.ty);
+      else if (e.kind === 'brazier') r.drawBrazier(e.x, e.y, timeS);
+      else if (e.kind === 'decor') {
+        const img = this.assets[this.actData.decor[e.d.kind] || 'dec_bones'];
+        if (img) {
+          const [px, py] = proj(e.x, e.y);
+          r.ctx.save(); r.ctx.translate(px, py); r.ctx.scale(1.4, .8);
+          r.ctx.drawImage(img, -42, -42, 84, 84); r.ctx.restore();
+        }
+      } else if (e.kind === 'chest') {
+        const img = this.assets.dec_chest;
+        if (img) {
+          const [px, py] = proj(e.c.x, e.c.y);
+          r.ctx.globalAlpha = e.c.opened ? .45 : 1;
+          r.ctx.save(); r.ctx.translate(px, py); r.ctx.scale(1.2, .85);
+          r.ctx.drawImage(img, -30, -46, 60, 60); r.ctx.restore();
+          r.ctx.globalAlpha = 1;
+        }
+      } else if (e.kind === 'mob') r.drawMob(this, e.m, timeS);
+      else r.drawHero(this, timeS);
+    }
     r.drawEffects(this, 1 / 60, timeS);
     r.drawLight(this, timeS); // включает restore из мировых координат
     this.ui.drawHud(ctx, this, this.input);

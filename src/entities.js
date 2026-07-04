@@ -1,7 +1,7 @@
 // Сущности и бой: герой, монстры, снаряды, зоны, статусы, дроп.
 import { TILE, MOBS, MOB_SCALE, SKILLS, CLASSES, ELITE_MODS, POTION_HEAL } from './data.js';
 import { collide, losClear } from './world.js';
-import { dist2, len, clamp, bus } from './core.js';
+import { dist2, len, clamp, bus, isoAngle } from './core.js';
 import { armorReduction, makeItem } from './items.js';
 
 export function makeMob(rng, kind, x, y, lvl, eliteMod) {
@@ -147,7 +147,7 @@ export function updateMob(g, m, dt) {
   if (m.slowT > 0) m.slowT -= dt;
   if (m.rootT > 0) { m.rootT -= dt; sp = 0; }
   m.dir = dx < 0 ? -1 : 1;
-  m.angle = Math.atan2(dy, dx);
+  m.angle = isoAngle(dx, dy);
   m.cd -= dt;
 
   // союзники героя воюют с монстрами
@@ -219,7 +219,7 @@ function updateAlly(g, m, dt) {
   }
   const dx = target.x - m.x, dy = target.y - m.y, d = Math.hypot(dx, dy);
   m.dir = dx < 0 ? -1 : 1;
-  m.angle = Math.atan2(dy, dx);
+  m.angle = isoAngle(dx, dy);
   if (d > m.r + target.r + 6) moveMob(g, m, dx / d, dy / d, m.speed, dt);
   else if (m.cd <= 0) {
     m.cd = 1;

@@ -1,10 +1,10 @@
 // Service Worker: полный прекэш — игра работает без сети после первого открытия.
-const VERSION = 'lastcandle-v3';
+const VERSION = 'lastcandle-v4';
 const CORE = [
   './', './index.html', './manifest.webmanifest',
   './src/main.js', './src/core.js', './src/data.js', './src/strings.js', './src/items.js',
   './src/world.js', './src/entities.js', './src/skills.js', './src/render.js', './src/ui.js',
-  './src/audio.js', './src/save.js', './src/flare.js', './assets/flare/meta.json',
+  './src/audio.js', './src/save.js', './src/flare.js', './assets/flare/meta.json', './assets/flare/tiles.webp',
 ];
 const FLARE = ['e_skeleton', 'e_skeleton_mage', 'e_zombie', 'e_goblin', 'e_antlion', 'e_minotaur', 'e_wyvern',
   'm_default_feet', 'm_default_legs', 'm_default_hands', 'm_default_chest', 'm_head_short',

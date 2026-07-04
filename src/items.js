@@ -134,7 +134,7 @@ export function computeStats(hero, CLASSES, SKILLS) {
   s.moveSpeed = 150 * (1 + s.moveMul + s.dex * .001);
   s.critCh = Math.min(75, s.crit + s.dex * .05);
   for (const r of ['resFire', 'resCold', 'resLight', 'resPoison']) s[r] = Math.min(75, s[r] + (s.resAll || 0));
-  s.lightRadius = 210 * (1 + s.lightR);
+  s.lightRadius = 320 * (1 + s.lightR);
   return s;
 }
 export const armorReduction = (armor, attackerLvl) => Math.min(.8, armor / (armor + 45 + 9 * attackerLvl));
