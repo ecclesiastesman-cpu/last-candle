@@ -36,3 +36,6 @@
 Хостинг: Higgsfield (game_id в deploy/deploy.json — обновление тем же id).
 Для GitHub Pages: создать пустой публичный репозиторий, положить содержимое game/
 (без assets_raw и deploy) + tools/pages-deploy.yml в .github/workflows/deploy.yml.
+
+## Обновление сайта
+Игра публикуется из ветки gh-pages: пуш в неё автоматически обновляет https://ecclesiastesman-cpu.github.io/last-candle/
