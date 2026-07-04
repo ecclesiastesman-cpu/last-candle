@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#05060a">
+<meta name="description" content="Последняя Свеча — мрачная оффлайн ARPG в духе Diablo. 5 классов, таланты, лут, боссы. Играет без интернета.">
+<title>Последняя Свеча</title>
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="icon" href="./assets/icon-192.png">
+<link rel="apple-touch-icon" href="./assets/icon-192.png">
+<style>
+html,body{margin:0;height:100%;overflow:hidden;background:#05060a;overscroll-behavior:none;
+  -webkit-user-select:none;user-select:none;-webkit-touch-callout:none;touch-action:none;
+  font-family:Georgia,'Times New Roman',serif;color:#e0d9c8}
+canvas{display:block;position:fixed;inset:0}
+#dev{position:fixed;top:calc(4px + env(safe-area-inset-top));left:4px;color:#0f0;font:12px monospace;display:none;z-index:99}
+#ui{position:fixed;inset:0;pointer-events:none;z-index:10}
+#ui .toast{position:relative;margin:6px auto 0;top:calc(70px + env(safe-area-inset-top));width:fit-content;max-width:86vw;
+  background:rgba(10,8,5,.88);border:1px solid #5c4a1e;padding:6px 14px;border-radius:3px;
+  font-size:14px;text-align:center;animation:toast 2.6s forwards;pointer-events:none}
+@keyframes toast{0%{opacity:0;transform:translateY(-8px)}12%{opacity:1;transform:none}80%{opacity:1}100%{opacity:0}}
+.panel{position:absolute;inset:0;background:rgba(5,4,2,.94);pointer-events:auto;overflow-y:auto;
+  padding:calc(8px + env(safe-area-inset-top)) 10px calc(20px + env(safe-area-inset-bottom));
+  -webkit-overflow-scrolling:touch;touch-action:pan-y}
+.bigtext .panel{font-size:118%}
+.tabs{display:flex;gap:6px;position:sticky;top:0;background:rgba(5,4,2,.97);padding:6px 0;z-index:2;align-items:center}
+.tab{flex:1;background:#161209;border:1px solid #5c4a1e;color:#c9bf9f;padding:10px 4px;font-family:inherit;font-size:15px;border-radius:2px}
+.tab.on{background:#2a2110;color:#ffd75e;border-color:#8c6d1f}
+.tab.x{flex:0 0 44px;color:#c62828;font-size:18px}
+.h1{font-size:20px;color:#e8dcc0;flex:1;text-align:center}
+.h1red{font-size:34px;color:#c62828;text-align:center;margin:30px 0 10px;text-shadow:0 0 24px #500}
+.h2{font-size:15px;color:#b98c1f;margin:12px 0 6px;border-bottom:1px solid #3a2f16;padding-bottom:3px}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.cols3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+@media (max-width:520px){.cols{grid-template-columns:1fr}.cols3{grid-template-columns:1fr}}
+.grid{display:flex;flex-direction:column;gap:5px}
+.item{border:1px solid #3a2f16;background:#100d07;padding:6px 8px;border-radius:2px}
+.item .iname{font-size:14px}
+.item .islot{font-size:11.5px;color:#8d8574}
+.r-common .iname{color:#c8c2b8}.r-magic .iname{color:#7aa9ff}.r-rare .iname{color:#ffd75e}
+.r-set .iname{color:#61d97a}.r-unique .iname{color:#ff9840}
+.eslot{font-size:13px;color:#8d8574;margin:4px 0}
+.eslot .item{display:inline-block;min-width:55%}
+.empty{color:#4a443a}
+.gold{margin:10px 0;font-size:15px}
+button{background:#1c1609;border:1px solid #8c6d1f;color:#e8dcc0;font-family:inherit;border-radius:2px;
+  padding:7px 12px;font-size:14px;margin:2px}
+button:active{background:#3a2d10}
+.big{display:block;width:100%;padding:15px;font-size:17px;margin:7px 0;text-align:left}
+.portal{border-color:#7a4a10;background:#1a1005}
+.rift{border-color:#6a1b9a}
+.townbtns{max-width:480px;margin:0 auto}
+.note{color:#6a6355;font-size:13px;text-align:center;margin:16px 0}
+.statrow{font-size:15px;margin:7px 0}
+.statrow button{padding:4px 14px;font-size:16px;margin-left:8px}
+.branch{background:#0d0b06;padding:6px;border:1px solid #2a2110}
+.talent{border-bottom:1px solid #241d0d;padding:7px 3px}
+.talent.locked{opacity:.45}
+.talent.known .tname{color:#ffd75e}
+.tname{font-size:14.5px}
+.trank{color:#8d8574;font-size:12px}
+.tdesc{font-size:12px;color:#8d8574;margin:2px 0}
+.tt{position:sticky;bottom:0;background:#0d0a05;border:1px solid #8c6d1f;padding:10px;margin-top:10px;border-radius:3px}
+.ttname{font-size:16px}
+.ttt,.ttreq{font-size:12px;color:#8d8574}
+.tts{font-size:13px;color:#9fb4c7;margin:2px 0}
+.tts .lore,.lore{color:#7a6a45;font-style:italic}
+.ttbtns{margin-top:8px;display:flex;flex-wrap:wrap;gap:4px}
+.death{text-align:center;max-width:420px;margin:14vh auto}
+.panel.transparent{background:linear-gradient(rgba(0,0,0,0) 30%,rgba(5,4,2,.88) 75%)}
+.menuwrap{max-width:420px;margin:0 auto;display:flex;flex-direction:column;min-height:92vh}
+.menuspacer{flex:1 1 46vh}
+.menubtn{text-align:center;font-size:20px;background:rgba(20,16,8,.85);padding:16px}
+.menubtn .sub,.classbtn .sub{font-size:13px;color:#8d8574;margin-top:4px;font-weight:normal}
+.classbtn b{font-size:17px;color:#ffd75e}
+.warn{background:#2a0d0d;border:1px solid #7a2020;padding:10px;margin:8px 0;text-align:center}
+.credits{color:#5a5348;font-size:11px;text-align:center;margin:18px 0 8px;line-height:1.5}
+.doll{text-align:center;background:radial-gradient(ellipse at 50% 80%,#241d0d 0%,#0d0b06 70%);
+  border:1px solid #3a2f16;border-radius:4px;margin-bottom:8px;padding:6px}
+.doll img{height:170px;image-rendering:auto;filter:drop-shadow(0 6px 8px rgba(0,0,0,.6))}
+.classbtn{display:flex;align-items:center;gap:12px}
+.classbtn .cprev{width:72px;height:88px;object-fit:contain;flex:0 0 72px;filter:drop-shadow(0 4px 6px rgba(0,0,0,.7))}
+.classbtn .ctext{display:block;flex:1}
+.classbtn .ctext .sub{display:block}
+.xpline{font-size:13px;color:#8d8574}
+#ttbox{display:none}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="ui"></div>
+<div id="dev"></div>
+<script>
+// показать dev-оверлей по ?dev=1
+if (new URLSearchParams(location.search).has('dev')) document.getElementById('dev').style.display='block';
+</script>
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>
