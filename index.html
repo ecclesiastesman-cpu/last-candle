@@ -152,7 +152,16 @@ button.primary{background:linear-gradient(#7a5c14,#3a2a08);border-color:#d8b25a;
 .tthint{font-size:11px;color:#5f5744;margin-top:6px;font-style:italic}
 .ttbtns{margin-top:9px;display:flex;flex-wrap:wrap;gap:5px}
 .death{text-align:center;max-width:420px;margin:14vh auto}
-.dialogbox{max-width:520px;margin:12vh auto;text-align:center;padding:22px 18px;
+.dlgport{width:112px;height:112px;object-fit:cover;object-position:top;display:block;margin:0 auto 10px;
+  border:2px solid #8c6d1f;border-radius:50%;background:radial-gradient(#2a2114,#0a0704);box-shadow:0 8px 20px rgba(0,0,0,.65)}
+.bosscard{position:fixed;left:50%;transform:translateX(-50%);top:88px;z-index:9;display:flex;gap:14px;align-items:center;
+  background:linear-gradient(rgba(24,10,8,.96),rgba(9,4,3,.96));border:1px solid #7a1a12;padding:10px 20px;max-width:78vw;
+  clip-path:polygon(10px 0,calc(100% - 10px) 0,100% 50%,calc(100% - 10px) 100%,10px 100%,0 50%);
+  animation:toast 3.6s forwards;pointer-events:none}
+.bosscard img{width:76px;height:76px;object-fit:cover;object-position:top;border:2px solid #7a1a12;border-radius:50%;background:#0a0503}
+.bosscard b{color:#ff6a4a;font-family:'Ruslan',Georgia,serif;font-size:20px;display:block;letter-spacing:.5px}
+.bosscard i{color:#c9a98c;font-style:normal;font-size:12px;font-family:'Forum',Georgia,serif}
+.dialogbox{max-width:520px;margin:9vh auto;text-align:center;padding:22px 18px;
   background:radial-gradient(ellipse at 50% 0%, rgba(90,66,26,.14), transparent 60%), linear-gradient(#14100a,#0a0704);
   border:1px solid #a4813a;outline:1px solid #241a08;outline-offset:2px;
   box-shadow:0 12px 34px rgba(0,0,0,.7), inset 0 0 18px rgba(0,0,0,.6)}
@@ -212,6 +221,7 @@ button.primary{background:linear-gradient(#7a5c14,#3a2a08);border-color:#d8b25a;
 .warn{background:rgba(60,10,10,.5);border:1px solid #8c2a2a;padding:10px;margin:8px 0;text-align:center;font-size:14px}
 .credits{margin-top:auto;padding-top:24px;color:#565045;font-size:11px;text-align:center;line-height:1.5}
 .classbtn{display:flex;align-items:center;gap:14px;padding:10px 14px}
+.classbtn .cport{width:78px;height:92px;object-fit:cover;object-position:top;flex:0 0 78px;border:1px solid #6b5320;border-radius:6px;background:radial-gradient(#221a0e,#0a0704);box-shadow:0 4px 10px rgba(0,0,0,.55)}
 .classbtn .cprev{width:64px;height:84px;object-fit:contain;flex:0 0 64px;
   filter:drop-shadow(0 4px 6px rgba(0,0,0,.8))}
 .classbtn .ctext{flex:1}

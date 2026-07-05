@@ -17,3 +17,10 @@ https://github.com/flareteam/flare-game
 
 ## Код и звук
 Движок, процедурный звук (WebAudio) — созданы для этого проекта.
+
+## Портреты (живопись)
+Портреты классов, NPC и боссов — из проекта **Battle for Wesnoth**
+(https://github.com/wesnoth/wesnoth), каталог data/core/images/portraits.
+Авторы: художники сообщества Wesnoth (в т.ч. Kathrin «Kitty» Polikeit, Emilien Rotival (LordBob) и др.).
+Лицензия арта: **CC BY-SA 4.0** (https://creativecommons.org/licenses/by-sa/4.0/).
+Изображения обрезаны и тонированы под палитру игры; производные — под той же лицензией.

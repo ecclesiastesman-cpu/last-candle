@@ -677,6 +677,7 @@ export class UI {
     // босс-бар: рисованная рама Flare с коваными концами (фолбэк — старые прямоугольники)
     const boss = g.mobs.find(m => m.boss && !m.dead && m.aggro);
     if (boss) {
+      if (!boss._intro) { boss._intro = 1; this.bossIntro(boss); }
       const frac = clamp(boss.hp / boss.maxHp, 0, 1);
       const bw = W * .58, bx = W / 2 - bw / 2;
       const bbg = this.uiImg('barbg'), bfl = this.uiImg('barfill');
@@ -1065,10 +1066,8 @@ export class UI {
     const html = `<div class="tabs"><div class="h1">${STR.chooseClass}</div><button class="tab x" data-act="mainmenu">←</button></div>
     <div class="townbtns">
       ${Object.keys(CLASSES).map(k => {
-        const url = this.classPreviewUrl(k);
-        if (!url) missing = true;
         return `<button class="big classbtn" data-act="pickclass" data-id="${k}">
-          ${url ? `<img class="cprev" src="${url}" alt="">` : '<span class="cprev"></span>'}
+          <img class="cprev cport" src="./assets/portraits/cls_${k}.webp" alt="">
           <span class="ctext"><b>${STR.classes[k].name}</b><span class="sub">${STR.classes[k].desc}</span></span>
         </button>`;
       }).join('')}
@@ -1121,11 +1120,23 @@ export class UI {
   }
   rDialog() {
     const o = this.opt || {};
+    const port = o.portrait || (String(o.name).includes('Мир') ? 'npc_elder' : 'npc_vendor');
     return `<div class="dialogbox">
+      <img class="dlgport" src="./assets/portraits/${port}.webp" alt="" onerror="this.remove()">
       <div class="h1">${esc(o.name || '')}</div>
       <div class="dlgtext">«${esc(o.text || '')}»</div>
       <button class="big primary" data-act="dialogok">Продолжить</button>
     </div>`;
+  }
+  // представление босса: живописный портрет + имя (один раз за встречу)
+  bossIntro(boss) {
+    this.root.querySelector('.bosscard')?.remove();
+    const el = document.createElement('div');
+    el.className = 'bosscard';
+    el.innerHTML = `<img src="./assets/portraits/${boss.kind}.webp" alt="" onerror="this.remove()">
+      <div><b>${STR.mobNames[boss.kind] || ''}</b><i>${STR.bossIntro || 'Восстал из тьмы'}</i></div>`;
+    this.root.appendChild(el);
+    setTimeout(() => el.remove(), 3600);
   }
   rDeath() {
     return `<div class="death"><div class="h1red">${STR.youDied}</div>
