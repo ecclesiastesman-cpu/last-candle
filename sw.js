@@ -1,10 +1,10 @@
 // Service Worker: полный прекэш — игра работает без сети после первого открытия.
-const VERSION = 'lastcandle-v11';
+const VERSION = 'lastcandle-v12';
 const CORE = [
   './', './index.html', './manifest.webmanifest',
   './src/main.js', './src/core.js', './src/data.js', './src/strings.js', './src/items.js',
   './src/world.js', './src/entities.js', './src/skills.js', './src/render.js', './src/ui.js',
-  './src/audio.js', './src/save.js', './src/flare.js', './assets/flare/meta.json', './assets/flare/tiles.webp',
+  './src/audio.js', './src/save.js', './src/flare.js', './src/act1.js', './assets/flare/meta.json', './assets/flare/tiles.webp',
   './assets/fonts/forum.woff2', './assets/fonts/ruslan.woff2',
 ];
 const LOOT = ['hand_axe', 'battle_axe', 'great_axe', 'greatsword', 'sword', 'shortbow', 'longbow', 'greatbow',

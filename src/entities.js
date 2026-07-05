@@ -45,7 +45,11 @@ export function damageMob(g, m, raw, opts = {}) {
     const imp = (opts.crit ? 240 : 130) * (m.elite ? .35 : 1);
     m.kvx = (m.kvx || 0) + kdx / kd * imp; m.kvy = (m.kvy || 0) + kdy / kd * imp;
   }
-  if (opts.crit) { g.hitStop = Math.max(g.hitStop || 0, .05); g.fx.shake(5); }
+  // хит-стоп с троттлингом: АоЕ-криты по толпе не складываются в постоянный фриз
+  if (opts.crit && (!g._hsT || g.time - g._hsT > .35)) {
+    g._hsT = g.time;
+    g.hitStop = Math.max(g.hitStop || 0, .05); g.fx.shake(5);
+  }
   if (s.leech > 0 && !opts.noLeech) healHero(g, dmg * s.leech);
   if (s.poisonOnHit && !opts.spell) m.dots.push({ dps: dmg * s.poisonOnHit / 3, t: 3, elem: 'poison' });
   if (opts.slow) { m.slowT = Math.max(m.slowT, opts.slow); }
@@ -62,7 +66,11 @@ export function damageMob(g, m, raw, opts = {}) {
 export function killMob(g, m) {
   if (m.dead) return; m.dead = true;
   bus.emit('mobDied', m);
-  g.hitStop = Math.max(g.hitStop || 0, m.boss ? .12 : m.elite ? .08 : .045);
+  // фриз на убийстве — тоже с троттлингом (вихрь по толпе не должен фризить постоянно)
+  if (m.boss || m.elite || !g._hsKT || g.time - g._hsKT > .4) {
+    g._hsKT = g.time;
+    g.hitStop = Math.max(g.hitStop || 0, m.boss ? .12 : m.elite ? .08 : .045);
+  }
   g.fx.burst(m.x, m.y, m.elite ? 22 : 12, '#8b0f23');
   if (m.flare && g.corpses) g.corpses.push({ flare: m.flare, x: m.x, y: m.y, angle: m.angle, r: m.r, fscale: m.fscale, tint: m.tint, t: 0 });
   if (m.type === 'ally') return;
@@ -208,7 +216,7 @@ export function updateMob(g, m, dt) {
       m.action = { name: 'swing', t: 0 };
       const ang = Math.atan2(dy, dx);
       g.telegraphs.push({ kind: 'arc', src: m, r: m.r + 52, angle: ang, spread: 1.6, t: 0, dur: .42, hit: () => {
-        if (m.dead) return;
+        if (m.dead || m.stunT > 0 || m.freezeT > 0 || m.fearT > 0) return;
         const hh = g.hero, ddx = hh.x - m.x, ddy = hh.y - m.y, dd = Math.hypot(ddx, ddy);
         if (dd > m.r + 52 || Math.abs(((Math.atan2(ddy, ddx) - ang + Math.PI * 3) % (Math.PI * 2)) - Math.PI) > .8) return;
         const dealt = damageHero(g, m.dmg, m.elem, m.lvl);
@@ -272,7 +280,7 @@ function updateBoss(g, m, dt, d, dx, dy) {
     m.action = { name: 'swing', t: 0 };
     const ang = Math.atan2(dy, dx);
     g.telegraphs.push({ kind: 'arc', src: m, r: m.r + 64, angle: ang, spread: 1.9, t: 0, dur: .5, hit: () => {
-      if (m.dead) return;
+      if (m.dead || m.stunT > 0 || m.freezeT > 0) return;
       const hh = g.hero, ddx = hh.x - m.x, ddy = hh.y - m.y, dd = Math.hypot(ddx, ddy);
       if (dd > m.r + 64 || Math.abs(((Math.atan2(ddy, ddx) - ang + Math.PI * 3) % (Math.PI * 2)) - Math.PI) > .95) return;
       const dealt = damageHero(g, m.dmg, m.elem, m.lvl);

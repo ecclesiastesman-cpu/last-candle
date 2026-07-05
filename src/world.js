@@ -135,6 +135,67 @@ export function losClear(f, x0, y0, x1, y1) {
   return true;
 }
 
+// ---- РУКОТВОРНЫЕ КАРТЫ (акт 1): дорога/залы по фиксированным координатам ----
+export function buildFixed(def, act, floorNum) {
+  const W = def.W, H = def.H;
+  const g = new Uint8Array(W * H); // всё стены
+  const carve = (x, y, rad) => {
+    for (let yy = Math.max(1, y - rad); yy <= Math.min(H - 2, y + rad); yy++)
+      for (let xx = Math.max(1, x - rad); xx <= Math.min(W - 2, x + rad); xx++)
+        g[yy * W + xx] = T_FLOOR;
+  };
+  // дорога: толстые отрезки между вейпоинтами
+  if (def.road) for (let i = 1; i < def.road.length; i++) {
+    const [x0, y0] = def.road[i - 1], [x1, y1] = def.road[i];
+    const steps = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0));
+    for (let s = 0; s <= steps; s++) {
+      carve(Math.round(x0 + (x1 - x0) * s / steps), Math.round(y0 + (y1 - y0) * s / steps), def.roadW || 2);
+    }
+  }
+  // залы
+  if (def.rooms) for (const [x, y, w, h] of def.rooms)
+    for (let yy = y; yy < y + h; yy++) for (let xx = x; xx < x + w; xx++)
+      if (xx > 0 && yy > 0 && xx < W - 1 && yy < H - 1) g[yy * W + xx] = T_FLOOR;
+  // коридоры между залами (Г-образные)
+  if (def.halls) for (const [[x0, y0], [x1, y1]] of def.halls) {
+    let x = x0, y = y0;
+    while (x !== x1) { g[y * W + x] = g[(y + 1) * W + x] = T_FLOOR; x += Math.sign(x1 - x); }
+    while (y !== y1) { g[y * W + x] = g[y * W + x + 1] = T_FLOOR; y += Math.sign(y1 - y); }
+  }
+  g[def.entry[1] * W + def.entry[0]] = T_ENTRY;
+  g[def.exit[1] * W + def.exit[0]] = T_EXIT;
+  const pal = PROPS[act] || PROPS[1];
+  const propAt = new Map(), propsFloor = [];
+  for (const [x, y] of def.props || []) {
+    if (g[y * W + x] === T_FLOOR) propAt.set(y * W + x, pal.solid[(x * 7 + y * 13) % pal.solid.length]);
+  }
+  for (const [x, y] of def.bones || []) {
+    if (g[y * W + x] === T_FLOOR) propsFloor.push({ tx: x, ty: y, group: pal.floor[(x + y) % pal.floor.length] });
+  }
+  const torches = (def.torches || []).map(([x, y]) => ({ x, y }));
+  const spawns = (def.spawns || []).map(([x, y, n, elite]) => ({ x, y, n, elite: !!elite }));
+  const chests = (def.chests || []).map(([x, y]) => ({ x, y }));
+  const decals = [];
+  const rng = makeRng((act * 7919 + floorNum * 131) >>> 0);
+  for (let k = 0; k < W * H / 55; k++) {
+    const x = rng.int(2, W - 3), y = rng.int(2, H - 3);
+    if (g[y * W + x] !== T_FLOOR) continue;
+    decals.push({ x: x * 64 + 32, y: y * 64 + 32, kind: rng.pick(['blood', 'crack', 'moss', 'blood']), r: rng.range(14, 34), a: 0, seed: rng.int(0, 999) });
+  }
+  // настенные скобы: та же гребёнка, что у генератора
+  const sconces = [];
+  for (let ty = 1; ty < H - 1; ty++) for (let tx = 1; tx < W - 1; tx++) {
+    if (g[ty * W + tx] !== T_WALL || g[(ty + 1) * W + tx] !== T_FLOOR) continue;
+    if (((tx * 7 + ty * 13) % 7) === 0) sconces.push({ tx, ty });
+  }
+  if (sconces.length > 30) sconces.length = 30;
+  const visited = new Uint8Array(W * H);
+  return { W, H, g, rooms: [], entry: { cx: def.entry[0], cy: def.entry[1] }, exit: { cx: def.exit[0], cy: def.exit[1] },
+    decor: [], torches, spawns, chests, decals, visited, bossSpawn: null,
+    act, floorNum, isBossFloor: false, propAt, propsFloor, sconces,
+    relic: def.relic ? { tx: def.relic[0], ty: def.relic[1] } : null, zoneName: def.name };
+}
+
 // ---- ЛАГЕРЬ (город): рукотворная площадь с костром и NPC ----
 export function genTown() {
   const W = 16, H = 14;
@@ -146,6 +207,7 @@ export function genTown() {
   const npcs = [
     { kind: 'vendor', x: 4.2 * 64, y: 4.6 * 64, angle: Math.PI * .75 },
     { kind: 'keeper', x: 11.2 * 64, y: 4.6 * 64, angle: Math.PI * .25 },
+    { kind: 'elder', x: 5.3 * 64, y: 9.6 * 64, angle: Math.PI * .4 },
     { kind: 'altar', x: 12.2 * 64, y: 9.2 * 64 },
     { kind: 'gates', x: 7.5 * 64, y: 12.1 * 64 },
   ];

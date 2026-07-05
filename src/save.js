@@ -13,6 +13,7 @@ export function saveGame(g) {
         equip: h.equip, inventory: h.inventory, skillBar: h.skillBar,
       },
       stash: g.stash,
+      quest: g.quest,
       progress: g.progress, // { act, floor, unlockedActs, cleared, difficulty, riftLvl }
       settings: g.settings,
       seedBase: g.seedBase,

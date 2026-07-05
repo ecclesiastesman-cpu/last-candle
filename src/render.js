@@ -249,7 +249,7 @@ export class Renderer {
       ctx.fillStyle = 'rgba(0,0,0,0.45)';
       ctx.beginPath(); ctx.ellipse(0, 5, 20, 8, 0, 0, 7); ctx.fill();
       ctx.restore();
-      const sheet = n.kind === 'vendor' ? 'n_trader' : 'n_guild';
+      const sheet = n.kind === 'vendor' ? 'n_trader' : n.kind === 'elder' ? 'n_peasant' : 'n_guild';
       const sm = fl?.meta?.[sheet];
       const drawn = sm && fl.draw(ctx, sheet, px, py + 5, 'stance', timeS * 1000 + n.x, n.angle ?? Math.PI / 2, 104 / sm.ay);
       if (!drawn) {
@@ -266,7 +266,7 @@ export class Renderer {
       }
     }
     // имя и приглашение
-    const name = ({ vendor: STRN.vendor, keeper: STRN.keeper, altar: STRN.altar, gates: STRN.gates, ret: STRN.ret })[n.kind] || '';
+    const name = ({ vendor: STRN.vendor, keeper: STRN.keeper, altar: STRN.altar, gates: STRN.gates, ret: STRN.ret, elder: STRN.elder })[n.kind] || '';
     ctx.font = 'bold 13px Georgia, serif'; ctx.textAlign = 'center';
     const ty = py - (n.kind === 'gates' || n.kind === 'ret' ? 110 : n.kind === 'altar' ? 120 : 115);
     ctx.strokeStyle = 'rgba(0,0,0,0.85)'; ctx.lineWidth = 3;
@@ -434,7 +434,7 @@ export class Renderer {
       ctx.lineWidth = 2.5; ctx.beginPath(); ctx.arc(0, 4, m.r * 1.4, 0, 7); ctx.stroke();
       ctx.globalAlpha = 1;
     }
-    if (m.hitT > 0) ctx.globalAlpha = .62;
+    if (m.hitT > 0) { ctx.globalAlpha = .9; try { ctx.filter = 'brightness(2.1) saturate(0.55)'; } catch {} } // белая вспышка попадания
     if (m.freezeT > 0) { ctx.filter = 'saturate(0.3) brightness(1.3)'; }
     let drawn = false;
     if (m.flare && g.flare) {

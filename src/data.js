@@ -114,7 +114,7 @@ export const MOBS = {
 export const MOB_SCALE = lvl => ({ hp: Math.pow(1.17, lvl - 1), dmg: Math.pow(1.115, lvl - 1), xp: Math.pow(1.09, lvl - 1) });
 
 export const ACTS = {
-  1: { tiles: 'tile_crypt', mobs: ['skeleton', 'zombie', 'ghoul'], boss: 'boss_bone', floors: 3, mobLvl: [1, 6], wall: '#1a1d24', fog: '#05060a', decor: ['dec_sarcophagus', 'dec_bones'] },
+  1: { tiles: 'tile_crypt', mobs: ['skeleton', 'zombie', 'ghoul'], boss: 'boss_bone', floors: 2, mobLvl: [1, 6], wall: '#1a1d24', fog: '#05060a', decor: ['dec_sarcophagus', 'dec_bones'] },
   2: { tiles: 'tile_catacomb', mobs: ['ghoul', 'bloater', 'cultist', 'zombie'], boss: 'boss_plague', floors: 3, mobLvl: [7, 13], wall: '#22201a', fog: '#070604', decor: ['dec_sarcophagus', 'dec_bones'] },
   3: { tiles: 'tile_torture', mobs: ['hound', 'cultist', 'knight', 'ghoul'], boss: 'boss_executioner', floors: 3, mobLvl: [14, 21], wall: '#241a1a', fog: '#080404', decor: ['dec_bones'] },
   4: { tiles: 'tile_hell', mobs: ['imp', 'hound', 'knight', 'bloater'], boss: 'boss_abyss', floors: 3, mobLvl: [22, 30], wall: '#2a1512', fog: '#0a0302', decor: ['dec_bones'] },

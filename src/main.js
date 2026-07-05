@@ -2,7 +2,8 @@
 import { STR } from './strings.js';
 import { TILE, CLASSES, SKILLS, ACTS, MOBS, XP_CURVE, POTION_HEAL, DEATH_GOLD_LOSS, RARITY } from './data.js';
 import { makeRng, Input, bus, clamp, dist2, proj, unprojDir, isoAngle } from './core.js';
-import { genFloor, genTown, collide, T_EXIT } from './world.js';
+import { genFloor, genTown, buildFixed, collide, T_EXIT } from './world.js';
+import { ACT1_MAPS, QUESTS } from './act1.js';
 import { makeMob, updateMob, damageMob, damageHero, healHero, gainXp } from './entities.js';
 import { useSkill, basicAttack, autoAim, canUse } from './skills.js';
 import { makeItem, computeStats, newUid, setUidBase, refreshIcon } from './items.js';
@@ -85,7 +86,18 @@ class Game {
     addEventListener('blur', () => { this.blurPause = true; });
     addEventListener('focus', () => { this.blurPause = false; this.last = performance.now(); });
     bus.on('heroDied', () => this.onDeath());
-    bus.on('bossDied', m => this.onBossDied(m));
+    bus.on('bossDied', m => {
+      if (this.quest?.i === 3 && this.progress.act === 1 && !this.progress.rift) this.questAdvance(4);
+      this.onBossDied(m);
+    });
+    bus.on('mobDied', m => {
+      if (this.quest?.i === 1 && !this.townMode && this.progress.act === 1 && this.progress.floor === 1 && !this.progress.rift && m.type !== 'ally') {
+        this.quest.k++;
+        const need = QUESTS[1].kills;
+        if (this.quest.k >= need) this.questAdvance(2);
+        else if ((this.quest.k % 5) === 0) this.ui.toast(`Тракт: ${this.quest.k}/${need}`, '#ffd75e');
+      }
+    });
     document.addEventListener('visibilitychange', () => { if (document.hidden) this.save(); });
     addEventListener('pagehide', () => this.save());
     this.state = 'title';
@@ -105,6 +117,7 @@ class Game {
       cooldowns: {}, buffs: [], attackCd: 0, attackT: 0, hurtT: 0, invulnT: 0, animT: 0, dead: false, slowT: 0,
     };
     this.stash = [];
+    this.quest = { i: 0, k: 0 };
     this.progress = { act: 1, floor: 1, unlockedActs: 1, cleared: false, riftLvl: 1, rift: false };
     this.vendorStock = [];
     this.rng = makeRng(this.seedBase ^ 0x9e37);
@@ -155,6 +168,7 @@ class Game {
       attackT: 0, hurtT: 0, invulnT: 0, animT: 0, dead: false, slowT: 0, hp: 1, res: 0,
     }, d.hero);
     this.stash = d.stash || [];
+    this.quest = d.quest || { i: 0, k: 0 };
     // старые сейвы: перевести иконки предметов на новые листы
     for (const it of this.hero.inventory || []) refreshIcon(it);
     for (const sl in this.hero.equip) refreshIcon(this.hero.equip[sl]);
@@ -198,7 +212,7 @@ class Game {
     this.chestObjs = [];
     this.townMode = true;
     this.rebuildHeroSheet();
-    if (this.flare?.meta) this.flare.preload(['n_trader', 'n_guild', 'm_default_feet', 'm_default_legs', 'm_default_hands', 'm_head_short', 'm_cloth_shirt', 'm_leather_chest', 'm_leather_hood']);
+    if (this.flare?.meta) this.flare.preload(['n_trader', 'n_guild', 'n_peasant', 'm_default_feet', 'm_default_legs', 'm_default_hands', 'm_head_short', 'm_cloth_shirt', 'm_leather_chest', 'm_leather_hood']);
     const [cpx, cpy] = proj(h.x, h.y);
     this.renderer.cam.px = cpx; this.renderer.cam.py = cpy;
     this.state = 'dungeon';
@@ -249,7 +263,10 @@ class Game {
     this.actData = ACTS[act];
     const isBoss = p.rift ? false : p.floor > ACTS[act].floors;
     const seed = (this.seedBase + act * 1000 + p.floor * 77 + (p.rift ? p.riftLvl * 31337 : 0)) >>> 0;
-    this.floor = genFloor(seed, act, p.floor, isBoss);
+    // акт 1: рукотворные карты (тракт и склеп), дальше — процедурные
+    if (!p.rift && act === 1 && !isBoss && p.floor <= ACT1_MAPS.length) {
+      this.floor = buildFixed(ACT1_MAPS[p.floor - 1], act, p.floor);
+    } else this.floor = genFloor(seed, act, p.floor, isBoss);
     this.frng = makeRng(seed ^ 0xabcdef);
     const h = this.hero;
     h.x = this.floor.entry.cx * TILE + TILE / 2; h.y = this.floor.entry.cy * TILE + TILE / 2;
@@ -285,6 +302,7 @@ class Game {
     }
     // сундуки как "монстры"-объекты попроще: массив
     this.chestObjs = this.floor.chests.map(c => ({ x: c.x * TILE + TILE / 2, y: c.y * TILE + TILE / 2, opened: false }));
+    if (this.floor.relic) this.chestObjs.push({ x: this.floor.relic.tx * TILE + TILE / 2, y: this.floor.relic.ty * TILE + TILE / 2, opened: false, relic: true });
     const [cpx, cpy] = proj(h.x, h.y);
     this.renderer.cam.px = cpx; this.renderer.cam.py = cpy;
     this.state = 'dungeon';
@@ -330,6 +348,56 @@ class Game {
     this.hero.potionCharges = this.stats.potions;
     this.dungeonCtx = null;
     this.restockVendor(); this.enterTown();
+  }
+
+  // ---------- КВЕСТЫ АКТА 1 ----------
+  questAdvance(to) {
+    this.quest.i = to; this.quest.k = 0;
+    this.ui.toast(to >= QUESTS.length ? STR.questDone : STR.questUpdated, '#ffd75e');
+    bus.emit('portal');
+    this.save();
+  }
+  // цель текущего шага на этом этаже (для стрелки-указателя)
+  questTarget() {
+    const q = this.quest;
+    if (!q || q.i >= QUESTS.length) return null;
+    const f = this.floor;
+    if (QUESTS[q.i].hint === 'elder') {
+      if (this.townMode) { const e = f.npcs?.find(n => n.kind === 'elder'); return e ? [e.x, e.y] : null; }
+      return null;
+    }
+    if (this.townMode) { const gts = f.npcs?.find(n => n.kind === 'gates'); return gts ? [gts.x, gts.y] : null; }
+    if (QUESTS[q.i].hint === 'kill') {
+      let best = null, bd = 1e18;
+      for (const m of this.mobs) { if (m.dead || m.type === 'ally') continue; const dd = dist2(m.x, m.y, this.hero.x, this.hero.y); if (dd < bd) { bd = dd; best = m; } }
+      if (best) return [best.x, best.y];
+      return [f.exit.cx * TILE + 32, f.exit.cy * TILE + 32];
+    }
+    if (QUESTS[q.i].hint === 'relic' && f.relic) {
+      const rc = this.chestObjs.find(c => c.relic);
+      if (rc && !rc.opened) return [rc.x, rc.y];
+    }
+    if (QUESTS[q.i].hint === 'boss') {
+      const b = this.mobs.find(m => m.boss && !m.dead);
+      if (b) return [b.x, b.y];
+    }
+    return [f.exit.cx * TILE + 32, f.exit.cy * TILE + 32];
+  }
+  elderTalk() {
+    const q = this.quest;
+    const i = Math.min(q.i, QUESTS.length - 1);
+    let after = null;
+    if (q.i === 0) after = () => this.questAdvance(1);
+    else if (q.i === 4) after = () => {
+      const h = this.hero;
+      h.gold += 400;
+      const it = makeItem(this.rng, Math.max(6, h.level), { rarity: 'rare' });
+      if (h.inventory.length < 24) h.inventory.push(it);
+      gainXp(this, 200);
+      this.ui.toast(`${STR.questReward}: 400 ✦ + ${it.name}`, '#ffd75e');
+      this.questAdvance(5);
+    };
+    this.ui.open('dialog', { name: STR.npc.elder, text: QUESTS[i].say, cb: after });
   }
 
   // ---------- ПРЕДМЕТЫ ----------
@@ -441,7 +509,8 @@ class Game {
       // возвратный портал
       this.nearReturn = this.dungeonCtx && dist2(this.floor.entry.cx * TILE + TILE, this.floor.entry.cy * TILE + 2.2 * TILE, h.x, h.y) < 80 * 80;
       const openNpc = n => {
-        if (n.kind === 'vendor') this.ui.open('vendor');
+        if (n.kind === 'elder') this.elderTalk();
+        else if (n.kind === 'vendor') this.ui.open('vendor');
         else if (n.kind === 'keeper') this.ui.open('stash');
         else if (n.kind === 'altar') this.ui.open('talents');
         else if (n.kind === 'gates') this.ui.open('portals');
@@ -586,6 +655,10 @@ class Game {
       if (dist2(c.x, c.y, h.x, h.y) < 55 * 55) {
         c.opened = true;
         bus.emit('openChest');
+        if (c.relic && this.quest?.i === 2) {
+          this.questAdvance(3);
+          this.drops.push({ kind: 'item', x: c.x, y: c.y + 16, item: makeItem(this.rng, this.mobLvl + 2, { rarity: 'rare' }), t: 0 });
+        }
         const n = this.rng.int(1, 3);
         for (let k = 0; k < n; k++) {
           if (this.rng.chance(.6)) this.drops.push({ kind: 'gold', x: c.x + this.rng.range(-20, 20), y: c.y + 16, amt: this.rng.int(10, 25) * this.mobLvl, t: 0 });

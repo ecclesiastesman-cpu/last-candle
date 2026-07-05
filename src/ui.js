@@ -1,6 +1,7 @@
 // UI: HUD на канвасе (джойстик, кнопки, орбы) + DOM-экраны (инвентарь, герой, таланты, лагерь).
 import { STR } from './strings.js';
 import { SKILLS, CLASSES, BASE_ITEMS, SETS, RARITY, GAMBLE_COST, RESPEC_COST, MAXLEVEL } from './data.js';
+import { QUESTS } from './act1.js';
 import { makeItem } from './items.js';
 import { canUse } from './skills.js';
 import { bus, clamp } from './core.js';
@@ -331,7 +332,7 @@ export class UI {
     ctx.fillStyle = 'rgba(0,0,0,0.5)';
     for (let i = 1; i < 10; i++) ctx.fillRect(xx + xw * i / 10, xy, 1, 5);
     // верхние плашки: акт и золото
-    const actName = g.townMode ? STR.town : g.progress.rift ? `${STR.rift} ${g.progress.riftLvl}` : `${STR.acts[g.progress.act].name} · ${STR.floor} ${g.progress.floor}`;
+    const actName = g.townMode ? STR.town : g.progress.rift ? `${STR.rift} ${g.progress.riftLvl}` : g.floor?.zoneName ? g.floor.zoneName : `${STR.acts[g.progress.act].name} · ${STR.floor} ${g.progress.floor}`;
     ctx.font = '13px Georgia, serif';
     const anw = ctx.measureText(actName).width + 18;
     this.drawPlaque(ctx, 8, 8, anw, 24);
@@ -449,6 +450,43 @@ export class UI {
     if (g.hero.statPts > 0 || g.hero.talentPts > 0) {
       ctx.fillStyle = '#ffd75e'; ctx.beginPath(); ctx.arc(W - 12, 46, 5, 0, 7); ctx.fill();
     }
+    // трекер задания (акт 1)
+    const q = g.quest;
+    if (q && q.i < QUESTS.length) {
+      const qd = QUESTS[q.i];
+      let txt = qd.text;
+      if (qd.kills) txt += ` (${Math.min(q.k, qd.kills)}/${qd.kills})`;
+      ctx.font = '12px Georgia, serif';
+      const qw = Math.min(ctx.measureText(txt).width + 26, W * .5);
+      this.drawPlaque(ctx, 8, 62, qw, 22);
+      ctx.fillStyle = '#e8c85a'; ctx.textAlign = 'left';
+      ctx.fillText('✦', 15, 78);
+      ctx.fillStyle = '#cfc4a2';
+      ctx.fillText(txt, 27, 78);
+      // стрелка-указатель к цели
+      const tgt = g.questTarget?.();
+      if (tgt && !g.hero.dead) {
+        const [sx, sy] = g.renderer.worldToScreen(tgt[0], tgt[1]);
+        const on = sx > 40 && sx < W - 40 && sy > 40 && sy < H - 40;
+        if (on) { // ромб над целью
+          const bob = Math.sin(timeS * 4) * 4;
+          ctx.save(); ctx.translate(sx, sy - 62 + bob); ctx.rotate(Math.PI / 4);
+          ctx.fillStyle = 'rgba(255,215,94,0.9)'; ctx.fillRect(-5, -5, 10, 10);
+          ctx.strokeStyle = 'rgba(40,28,6,0.9)'; ctx.lineWidth = 2; ctx.strokeRect(-5, -5, 10, 10);
+          ctx.restore();
+        } else { // стрелка по краю от героя
+          const [hx, hy] = g.renderer.worldToScreen(g.hero.x, g.hero.y);
+          const an = Math.atan2(sy - hy, sx - hx);
+          const ax2 = hx + Math.cos(an) * 96, ay2 = hy + Math.sin(an) * 96;
+          ctx.save(); ctx.translate(ax2, ay2); ctx.rotate(an);
+          ctx.globalAlpha = .85;
+          ctx.fillStyle = '#ffd75e';
+          ctx.beginPath(); ctx.moveTo(12, 0); ctx.lineTo(-7, -7); ctx.lineTo(-3, 0); ctx.lineTo(-7, 7); ctx.closePath(); ctx.fill();
+          ctx.strokeStyle = 'rgba(40,28,6,0.9)'; ctx.lineWidth = 1.5; ctx.stroke();
+          ctx.restore(); ctx.globalAlpha = 1;
+        }
+      }
+    }
     // миникарта
     this.drawMinimap(ctx, g, W, land);
     // босс-бар
@@ -555,7 +593,7 @@ export class UI {
     p.className = 'panel' + (this.screen === 'mainmenu' ? ' transparent' : '');
     const fn = { inventory: this.rInventory, character: this.rCharacter, talents: this.rTalents,
       town: this.rTown, vendor: this.rVendor, stash: this.rStash, death: this.rDeath, settings: this.rSettings,
-      mainmenu: this.rMainMenu, classpick: this.rClassPick, portals: this.rPortals }[this.screen];
+      mainmenu: this.rMainMenu, classpick: this.rClassPick, portals: this.rPortals, dialog: this.rDialog }[this.screen];
     p.innerHTML = fn.call(this);
     this.root.appendChild(p);
     this.bindPanel(p);
@@ -817,6 +855,14 @@ export class UI {
     </div>
     <div id="ttbox"></div>`;
   }
+  rDialog() {
+    const o = this.opt || {};
+    return `<div class="dialogbox">
+      <div class="h1">${esc(o.name || '')}</div>
+      <div class="dlgtext">«${esc(o.text || '')}»</div>
+      <button class="big primary" data-act="dialogok">Продолжить</button>
+    </div>`;
+  }
   rDeath() {
     return `<div class="death"><div class="h1red">${STR.youDied}</div>
     <div class="note">${STR.deathHint}${this.opt?.goldLost || 0} ✦</div>
@@ -905,6 +951,7 @@ export class UI {
         case 'goact': g.enterAct(Number(id)); this.closeScreen(); break;
         case 'gorift': g.enterRift(); this.closeScreen(); break;
         case 'revive': g.revive(); this.closeScreen(); break;
+        case 'dialogok': { const cb = this.opt?.cb; this.closeScreen(); if (cb) cb(); break; }
       }
     });
   }
