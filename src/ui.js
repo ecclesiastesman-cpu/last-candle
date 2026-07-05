@@ -24,7 +24,7 @@ export class UI {
   skillCard(sk, waitedMs = 0) {
     const g = this.g;
     const hot = g.hero.hurtT > 0 || g.mobs?.some(m => m.aggro && !m.dead && m.type !== 'ally');
-    if (hot && waitedMs < 8000) { setTimeout(() => this.skillCard(sk, waitedMs + 2000), 2000); return; }
+    if (hot && waitedMs < 14000) { setTimeout(() => this.skillCard(sk, waitedMs + 2000), 2000); return; }
     this.root.querySelector('.skillcard')?.remove();
     const id = Object.keys(SKILLS).find(k => SKILLS[k] === sk);
     const el = document.createElement('div');
@@ -437,8 +437,10 @@ export class UI {
       '#e0402e', '#5e0a0a', Math.ceil(h.hp), timeS, h.hp < s.maxHp * .3);
     if (mpPos) this.drawOrb(ctx, mpPos[0], mpPos[1], orbR, clamp(h.res / s.maxRes, 0, 1),
       resCol[0], resCol[1], Math.ceil(h.res), timeS, false);
-    // XP: золочёный жёлоб с насечками (шире, как нижняя кромка DI)
-    const xw = W * (land ? .40 : .44), xx = W / 2 - xw / 2, xy = H - 12; // зазор под home-индикатор iPhone
+    // XP: золочёный жёлоб с насечками; в DI-раскладке смещён влево от орба HP, чтобы не прятаться под рамой
+    const xw = W * (diOrbs ? .26 : land ? .40 : .44);
+    const xx = diOrbs ? W * .30 : W / 2 - xw / 2;
+    const xy = H - 12; // зазор под home-индикатор iPhone
     ctx.fillStyle = 'rgba(0,0,0,0.72)';
     ctx.beginPath(); ctx.roundRect(xx - 2, xy - 2, xw + 4, 9, 4); ctx.fill();
     ctx.strokeStyle = 'rgba(140,109,31,0.5)'; ctx.lineWidth = 1; ctx.stroke();
@@ -535,7 +537,11 @@ export class UI {
         if (sockImg) { const S = 27 * 2.5; ctx.drawImage(sockImg, pos.x - S / 2, pos.y - S / 2, S, S); }
         else ctx.drawImage(sock, pos.x - sock.width / 2, pos.y - sock.height / 2);
         ctx.strokeStyle = '#d9cba3'; ctx.fillStyle = '#d9cba3';
+        ctx.save(); // глиф ложится на бронзу: чёрный фон иконки растворяется (screen), край режется по кругу
+        ctx.beginPath(); ctx.arc(pos.x, pos.y, 20, 0, 7); ctx.clip();
+        ctx.globalCompositeOperation = 'screen';
         this.drawSkillGlyph(ctx, { id }, pos.x, pos.y, 14);
+        ctx.restore();
         const cd = g.hero.cooldowns[id];
         if (cd > 0 && SKILLS[id]?.cd) {
           ctx.fillStyle = 'rgba(0,0,0,0.68)';
@@ -592,8 +598,8 @@ export class UI {
       // счётчик зарядов
       ctx.fillStyle = '#efe6d0'; ctx.font = 'bold 12px Georgia'; ctx.textAlign = 'center';
       ctx.strokeStyle = 'rgba(0,0,0,0.8)'; ctx.lineWidth = 3;
-      ctx.strokeText(h.potionCharges, px + 16, py + 16);
-      ctx.fillText(h.potionCharges, px + 16, py + 16);
+      ctx.strokeText(h.potionCharges, px + 20, py + 18);
+      ctx.fillText(h.potionCharges, px + 20, py + 18);
     }
     // кнопка городского портала (в подземелье)
     if (!g.townMode) {
