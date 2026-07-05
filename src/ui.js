@@ -19,7 +19,8 @@ export class UI {
     bus.on('pickupItem', (r, name) => { if (r !== 'common') this.toast(name, RC[r]); });
   }
   // DI-попап: подобрано улучшение — «Надеть?» одним тапом
-  equipPrompt(it) {
+  equipPrompt(it, retried) {
+    if (this.g.hero.hurtT > 0 && !retried) { setTimeout(() => this.equipPrompt(it, true), 1500); return; }
     this.root.querySelector('.equipprompt')?.remove();
     const el = document.createElement('div');
     el.className = 'equipprompt';
@@ -321,7 +322,7 @@ export class UI {
       asHome = [W - SL - 112, H - 102];
       hpPos = [SL + 264, H - orbR - 14];
       mpPos = [W - SL - 264, H - orbR - 14];
-      potPos = [SL + 264 + orbR + 34, H - 42];
+      potPos = [W - SL - 194, H - 42]; // в правом кластере — достаёт большой палец
     } else {
       lsHome = [96, H - 148 - safeB];
       asHome = [W - 96, H - 148 - safeB];
@@ -502,7 +503,7 @@ export class UI {
         const on = sx > 40 && sx < W - 40 && sy > 40 && sy < H - 40;
         if (on) { // ромб над целью
           const bob = Math.sin(timeS * 4) * 4;
-          ctx.save(); ctx.translate(sx, sy - 62 + bob); ctx.rotate(Math.PI / 4);
+          ctx.save(); ctx.translate(sx, sy - 86 + bob); ctx.rotate(Math.PI / 4);
           ctx.fillStyle = 'rgba(255,215,94,0.9)'; ctx.fillRect(-5, -5, 10, 10);
           ctx.strokeStyle = 'rgba(40,28,6,0.9)'; ctx.lineWidth = 2; ctx.strokeRect(-5, -5, 10, 10);
           ctx.restore();
@@ -562,6 +563,21 @@ export class UI {
     // босс
     const boss = g.mobs.find(m => m.boss && !m.dead && m.aggro);
     if (boss) { ctx.fillStyle = '#c62828'; ctx.beginPath(); ctx.arc(mx + boss.x / 64 * cell, my + boss.y / 64 * cell, 2.5, 0, 7); ctx.fill(); }
+    // цель квеста — золотой ромб
+    const qt = g.questTarget?.();
+    if (qt) {
+      ctx.save();
+      ctx.translate(mx + qt[0] / 64 * cell, my + qt[1] / 64 * cell);
+      ctx.rotate(Math.PI / 4);
+      ctx.fillStyle = '#ffd75e'; ctx.fillRect(-2.4, -2.4, 4.8, 4.8);
+      ctx.restore();
+    }
+    // вейпоинт — синяя точка
+    if (f.waypoint) {
+      const wkey = 'a' + g.progress.act + 'f' + g.progress.floor;
+      ctx.fillStyle = g.progress.wps?.[wkey] ? '#7fb2ff' : '#44506a';
+      ctx.beginPath(); ctx.arc(mx + f.waypoint.tx * cell, my + f.waypoint.ty * cell, 2.4, 0, 7); ctx.fill();
+    }
     // герой
     ctx.fillStyle = '#e8dcc0';
     ctx.beginPath(); ctx.arc(mx + g.hero.x / 64 * cell, my + g.hero.y / 64 * cell, 2.2, 0, 7); ctx.fill();
@@ -864,6 +880,8 @@ export class UI {
     return `<div class="tabs"><div class="h1">${STR.portalTo}</div><button class="tab x" data-act="close">✕</button></div>
     <div class="townbtns">
       ${acts.map(a => `<button class="big portal" data-act="goact" data-id="${a}">${STR.acts[a].name}${a === g.progress.act ? ` · ${STR.floor} ${g.progress.floor}` : ''}</button>`).join('')}
+      ${g.progress.wps?.a1f1 ? `<button class="big portal" data-act="gowp" data-id="1">⚑ Кладбищенский тракт — вейпоинт</button>` : ''}
+      ${g.progress.wps?.a1f2 ? `<button class="big portal" data-act="gowp" data-id="2">⚑ Проклятый склеп — вейпоинт</button>` : ''}
       ${g.progress.cleared ? `<button class="big portal rift" data-act="gorift">🌀 ${STR.rift} ${g.progress.riftLvl}</button>` : ''}
     </div>`;
   }
@@ -871,7 +889,8 @@ export class UI {
     const g = this.g, h = g.hero;
     if (!g.vendorStock.length) g.restockVendor();
     return `<div class="tabs"><div class="h1">${STR.vendor}</div><button class="tab x" data-act="town">←</button></div>
-    <div class="gold">${STR.gold}: <b>${h.gold} ✦</b> · <button data-act="gamble">${STR.gamble} (${GAMBLE_COST(h.level)} ✦)</button></div>
+    <div class="gold">${STR.gold}: <b>${h.gold} ✦</b> · <button data-act="gamble">${STR.gamble} (${GAMBLE_COST(h.level)} ✦)</button>
+      <button data-act="sellJunk">Продать хлам (${h.inventory.filter(x => x.rarity === 'common' || x.rarity === 'magic').reduce((a, x) => a + Math.floor(x.price / 3), 0)} ✦)</button></div>
     <div class="invwrap">
       <div class="invleft"><div class="h2">${STR.buy}</div><div class="grid">${g.vendorStock.map(it => this.itemHtml(it, 'shop')).join('')}</div></div>
       <div class="invright"><div class="h2">${STR.sell}</div><div class="grid">${h.inventory.map(it => this.itemHtml(it, 'sellbag')).join('') || '<span class="empty">пусто</span>'}</div></div>
@@ -949,6 +968,15 @@ export class UI {
         case 'respec': if (h.gold >= RESPEC_COST(h.level)) { h.gold -= RESPEC_COST(h.level);
           let refund = 0; for (const k in h.talents) refund += h.talents[k];
           h.talents = {}; h.skillBar = []; h.talentPts += refund; g.recalc(); this.render(); } else this.toast(STR.notEnoughGold, '#c62828'); break;
+        case 'sellJunk': {
+          const junk = h.inventory.filter(x => x.rarity === 'common' || x.rarity === 'magic');
+          if (!junk.length) break;
+          const sum = junk.reduce((a, x) => a + Math.floor(x.price / 3), 0);
+          h.inventory = h.inventory.filter(x => x.rarity !== 'common' && x.rarity !== 'magic');
+          h.gold += sum;
+          this.toast(`Продано ${junk.length} шт. за ${sum} ✦`, '#ffd75e');
+          this.render(); break;
+        }
         case 'gamble': {
           const cost = GAMBLE_COST(h.level);
           if (h.gold < cost) { this.toast(STR.notEnoughGold, '#c62828'); break; }
@@ -981,6 +1009,7 @@ export class UI {
         case 'stashIt': { const it = find(h.inventory, id); if (it && g.stash.length < 48) { h.inventory = h.inventory.filter(x => x !== it); g.stash.push(it); this.render(); } break; }
         case 'unstashIt': { const it = find(g.stash, id); if (it && h.inventory.length < 24) { g.stash = g.stash.filter(x => x !== it); h.inventory.push(it); this.render(); } break; }
         case 'goact': g.enterAct(Number(id)); this.closeScreen(); break;
+        case 'gowp': g.enterAct(1, Number(id), true); this.closeScreen(); break;
         case 'gorift': g.enterRift(); this.closeScreen(); break;
         case 'revive': g.revive(); this.closeScreen(); break;
         case 'dialogok': { const cb = this.opt?.cb; this.closeScreen(); if (cb) cb(); break; }

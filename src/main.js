@@ -6,7 +6,7 @@ import { genFloor, genTown, buildFixed, collide, T_EXIT } from './world.js';
 import { ACT1_MAPS, QUESTS } from './act1.js';
 import { makeMob, updateMob, damageMob, damageHero, healHero, gainXp, unlockSkills } from './entities.js';
 import { useSkill, basicAttack, autoAim, canUse } from './skills.js';
-import { makeItem, computeStats, newUid, setUidBase, refreshIcon, isUpgrade } from './items.js';
+import { makeItem, computeStats, newUid, setUidBase, refreshIcon, isUpgrade, itemScore } from './items.js';
 import { SETS } from './data.js';
 import { Renderer } from './render.js';
 import { UI } from './ui.js';
@@ -91,6 +91,9 @@ class Game {
       this.onBossDied(m);
     });
     bus.on('mobDied', m => {
+      if (this.quest?.i === 0 && !this.townMode && this.progress.act === 1 && this.progress.floor === 1 && !this.progress.rift && m.type !== 'ally') {
+        this.quest.i = 1; this.quest.k = 0; // пропустил старейшину — задание берётся само
+      }
       if (this.quest?.i === 1 && !this.townMode && this.progress.act === 1 && this.progress.floor === 1 && !this.progress.rift && m.type !== 'ally') {
         this.quest.k++;
         const need = QUESTS[1].kills;
@@ -118,7 +121,7 @@ class Game {
     };
     this.stash = [];
     this.quest = { i: 0, k: 0 };
-    this.progress = { act: 1, floor: 1, unlockedActs: 1, cleared: false, riftLvl: 1, rift: false };
+    this.progress = { act: 1, floor: 1, unlockedActs: 1, cleared: false, riftLvl: 1, rift: false, wps: {} };
     this.vendorStock = [];
     this.rng = makeRng(this.seedBase ^ 0x9e37);
     // стартовое оружие
@@ -180,6 +183,7 @@ class Game {
     setUidBase(d.uid || 1000);
     this.vendorStock = [];
     this.rng = makeRng((this.seedBase ^ (Date.now() & 0xffff)) >>> 0);
+    unlockSkills(this);
     this.recalc();
     this.rebuildHeroSheet();
     this.hero.hp = this.stats.maxHp; this.hero.res = this.stats.maxRes * .5;
@@ -210,6 +214,7 @@ class Game {
     h.dead = false; h.deadT = 0;
     this.mobs = []; this.projectiles = []; this.zones = []; this.traps = []; this.drops = []; this.corpses = [];
     this.telegraphs = [];
+    this.siege = null;
     this.chestObjs = [];
     this.townMode = true;
     this.rebuildHeroSheet();
@@ -218,7 +223,52 @@ class Game {
     this.renderer.cam.px = cpx; this.renderer.cam.py = cpy;
     this.state = 'dungeon';
     this.hero.potionCharges = Math.max(this.hero.potionCharges, Math.min(this.stats.potions, 3));
+    // осада лагеря: случайное событие (не при входе через портал и не дважды подряд)
+    if (this.quest?.i >= 1 && !this.dungeonCtx && !this._justSieged && this.rng.chance(.3)) {
+      setTimeout(() => this.startSiege(), 1600);
+    } else this._justSieged = false;
     this.save();
+  }
+  // ---------- ОСАДА ЛАГЕРЯ ----------
+  startSiege() {
+    if (!this.townMode || this.siege) return;
+    this.siege = { wave: 1, waves: 2 };
+    this._justSieged = true;
+    this.banner = { text: 'ЛАГЕРЬ ПОД ОСАДОЙ!', t: 3 };
+    this.ui.toast('Защити лагерь у врат!', '#c62828');
+    bus.emit('bossStart');
+    this.spawnSiegeWave();
+  }
+  spawnSiegeWave() {
+    const f = this.floor;
+    const lvl = Math.max(2, Math.min(this.hero.level, 12));
+    const n = 4 + this.siege.wave * 2;
+    for (let i = 0; i < n; i++) {
+      const kind = this.rng.pick(['skeleton', 'zombie', 'ghoul']);
+      const m = makeMob(this.rng, kind, (6.8 + this.rng.range(0, 1.6)) * TILE, (11.2 + this.rng.range(0, 1.2)) * TILE, lvl,
+        i === 0 && this.siege.wave === 2 ? this.rng.pick(['fast', 'vampiric']) : null);
+      m.aggro = true;
+      this.mobs.push(m);
+    }
+  }
+  updateSiege() {
+    if (!this.siege) return;
+    if (this.mobs.some(m => !m.dead && m.type !== 'ally')) return;
+    if (this.siege.wave < this.siege.waves) {
+      this.siege.wave++;
+      this.ui.toast(`Волна ${this.siege.wave}!`, '#ffd75e');
+      this.spawnSiegeWave();
+    } else {
+      this.siege = null;
+      this.banner = { text: 'ЛАГЕРЬ ОТСТОЯН', t: 3 };
+      const gold = 120 + this.hero.level * 25;
+      this.hero.gold += gold;
+      this.drops.push({ kind: 'item', x: this.floor.campfire.tx * TILE + 96, y: this.floor.campfire.ty * TILE + 96,
+        item: makeItem(this.rng, this.hero.level + 1, { magicFind: .9 }), t: 0 });
+      this.ui.toast(`Награда: ${gold} ✦`, '#ffd75e');
+      gainXp(this, 60 + this.hero.level * 14);
+      this.save();
+    }
   }
   // городской портал: сохранить контекст подземелья и вернуться точно назад
   castTownPortal() {
@@ -248,10 +298,16 @@ class Game {
   }
 
   // ---------- УРОВНИ ----------
-  enterAct(act) {
-    this.progress.act = act; this.progress.floor = 1; this.progress.rift = false;
+  enterAct(act, floor = 1, atWp = false) {
+    this.progress.act = act; this.progress.floor = floor; this.progress.rift = false;
     this.townMode = false; this.dungeonCtx = null;
     this.loadFloor();
+    if (atWp && this.floor.waypoint) {
+      this.hero.x = this.floor.waypoint.tx * TILE + TILE / 2;
+      this.hero.y = (this.floor.waypoint.ty + 1) * TILE + TILE / 2;
+      const [cpx, cpy] = proj(this.hero.x, this.hero.y);
+      this.renderer.cam.px = cpx; this.renderer.cam.py = cpy;
+    }
   }
   enterRift() {
     this.progress.rift = true;
@@ -361,6 +417,7 @@ class Game {
   // ---------- КВЕСТЫ АКТА 1 ----------
   questAdvance(to) {
     this.quest.i = to; this.quest.k = 0;
+    if (to >= 2 && to <= 4) gainXp(this, 100 + this.hero.level * 12);
     this.ui.toast(to >= QUESTS.length ? STR.questDone : STR.questUpdated, '#ffd75e');
     bus.emit('portal');
     this.save();
@@ -391,11 +448,16 @@ class Game {
     }
     return [f.exit.cx * TILE + 32, f.exit.cy * TILE + 32];
   }
-  elderTalk() {
+  elderTalk(then = null) {
     const q = this.quest;
     const i = Math.min(q.i, QUESTS.length - 1);
-    let after = null;
-    if (q.i === 0) after = () => this.questAdvance(1);
+    const REMIND = {
+      1: 'Тракт всё ещё кишит мертвецами — возвращайся, когда дорога будет чиста.',
+      2: 'Реликварий ждёт в глубине Проклятого склепа. Не задерживайся.',
+      3: 'Костяной лорд всё ещё жив. Спустись и покончи с ним.',
+    };
+    let after = then;
+    if (q.i === 0) after = () => { this.questAdvance(1); if (then) then(); };
     else if (q.i === 4) after = () => {
       const h = this.hero;
       h.gold += 400;
@@ -405,7 +467,8 @@ class Game {
       this.ui.toast(`${STR.questReward}: 400 ✦ + ${it.name}`, '#ffd75e');
       this.questAdvance(5);
     };
-    this.ui.open('dialog', { name: STR.npc.elder, text: QUESTS[i].say, cb: after });
+    const text = (q.i >= 1 && q.i <= 3) ? REMIND[q.i] : QUESTS[i].say;
+    this.ui.open('dialog', { name: STR.npc.elder, text, cb: after });
   }
 
   // ---------- ПРЕДМЕТЫ ----------
@@ -415,15 +478,22 @@ class Game {
     if (!it) return;
     if (h.level < it.req) { this.ui.toast(`${STR.requires} ${it.req} ${STR.levelShort}`, '#c62828'); return; }
     let slot = it.slot;
-    if (slot === 'ring') slot = !h.equip.ring1 ? 'ring1' : !h.equip.ring2 ? 'ring2' : 'ring1';
+    if (slot === 'ring') slot = !h.equip.ring1 ? 'ring1' : !h.equip.ring2 ? 'ring2'
+      : (itemScore(h.equip.ring1) <= itemScore(h.equip.ring2) ? 'ring1' : 'ring2');
     // класс-ограничение оружия
     if (slot === 'weapon' && !this.cls.weapons.includes(it.base)) { this.ui.toast('Не для этого класса', '#c62828'); return; }
     const old = h.equip[slot];
     h.inventory = h.inventory.filter(x => x !== it);
     h.equip[slot] = it;
-    // двуручное вытесняет щит
-    if (slot === 'weapon' && it.twoHand && h.equip.offhand) { h.inventory.push(h.equip.offhand); h.equip.offhand = null; }
-    if (slot === 'offhand' && h.equip.weapon?.twoHand) { h.inventory.push(h.equip.weapon); h.equip.weapon = null; }
+    // двуручное вытесняет щит (вытесненное не должно переполнить сумку)
+    if (slot === 'weapon' && it.twoHand && h.equip.offhand) {
+      if (h.inventory.length >= 24) { h.inventory.push(it); h.equip[slot] = old || null; this.ui.toast(STR.inventoryFull, '#c62828'); return; }
+      h.inventory.push(h.equip.offhand); h.equip.offhand = null;
+    }
+    if (slot === 'offhand' && h.equip.weapon?.twoHand) {
+      if (h.inventory.length >= 24) { h.inventory.push(it); h.equip[slot] = old || null; this.ui.toast(STR.inventoryFull, '#c62828'); return; }
+      h.inventory.push(h.equip.weapon); h.equip.weapon = null;
+    }
     if (old) h.inventory.push(old);
     this.recalc();
     this.rebuildHeroSheet();
@@ -491,7 +561,7 @@ class Game {
     if (buffDirty) this.recalcBuffs();
     // ресурс
     const cls = this.cls;
-    if (cls.resRegen) h.res = clamp(h.res + cls.resRegen * dt * (cls.resource === 'focus' && h.moving ? 1.6 : 1), 0, s.maxRes);
+    if (cls.resRegen) h.res = clamp(h.res + cls.resRegen * dt * (cls.resource === 'focus' && !h.moving ? 1.6 : 1), 0, s.maxRes);
     h.hp = Math.min(s.maxHp, h.hp + s.hpRegen * dt);
     // движение
     let mx = cmds.moveX, my = cmds.moveY;
@@ -508,8 +578,9 @@ class Game {
       h.x = nx; h.y = ny;
     }
     if (h.slowT > 0) h.slowT -= dt;
-    // город: взаимодействие с NPC, боя нет
-    if (this.townMode) {
+    if (this.townMode && this.siege) this.updateSiege();
+    // город: взаимодействие с NPC, боя нет (кроме осады)
+    if (this.townMode && !this.siege) {
       this.nearNpc = null;
       for (const n of this.floor.npcs) {
         if (dist2(n.x, n.y, h.x, h.y) < 85 * 85) { this.nearNpc = n; break; }
@@ -521,7 +592,11 @@ class Game {
         else if (n.kind === 'vendor') this.ui.open('vendor');
         else if (n.kind === 'keeper') this.ui.open('stash');
         else if (n.kind === 'altar') this.ui.open('talents');
-        else if (n.kind === 'gates') this.ui.open('portals');
+        else if (n.kind === 'gates') {
+          // квест ещё не взят — сначала слово старейшины, затем врата
+          if (this.quest?.i === 0) this.elderTalk(() => this.ui.open('portals'));
+          else this.ui.open('portals');
+        }
       };
       if (cmds.once.has('interact') || cmds.once.has('attack')) {
         if (this.nearReturn) this.returnFromTown();
@@ -581,12 +656,11 @@ class Game {
           for (const m of this.mobs) {
             if (m.dead || m.type === 'ally') continue;
             if (dist2(p.x, p.y, m.x, m.y) < (m.r + p.r) ** 2) {
-              const mul = 1 + (m.dmgTakenMul || 0);
-              damageMob(this, m, p.dmg * mul, { spell: p.spell, elem: p.elem, slow: p.slow, dot: p.dot });
+              damageMob(this, m, p.dmg, { spell: p.spell, elem: p.elem, slow: p.slow, dot: p.dot });
               if (p.splash) {
                 for (const o of this.mobs) {
                   if (o === m || o.dead || o.type === 'ally') continue;
-                  if (dist2(o.x, o.y, m.x, m.y) < p.splash ** 2) damageMob(this, o, p.dmg * .6 * (1 + (o.dmgTakenMul || 0)), { spell: p.spell, elem: p.elem });
+                  if (dist2(o.x, o.y, m.x, m.y) < p.splash ** 2) damageMob(this, o, p.dmg * .6, { spell: p.spell, elem: p.elem });
                 }
                 this.fx.explosion(m.x, m.y, p.splash, p.color);
               }
@@ -610,7 +684,7 @@ class Game {
           for (const m of this.mobs) {
             if (m.dead || m.type === 'ally') continue;
             if (dist2(m.x, m.y, z.x, z.y) < (z.r + m.r) ** 2)
-              damageMob(this, m, z.dps * (1 + (m.dmgTakenMul || 0)), { spell: true, elem: z.elem, root: z.root, noLeech: true });
+              damageMob(this, m, z.dps, { spell: true, elem: z.elem, root: z.root, noLeech: true });
           }
         } else if (dist2(h.x, h.y, z.x, z.y) < (z.r + h.r) ** 2) damageHero(this, z.dps, z.elem, z.lvl || 1);
         if (z.oneshot) z.t = 0;
@@ -634,7 +708,7 @@ class Game {
         for (const m of this.mobs) {
           if (m.dead || m.type === 'ally') continue;
           if (dist2(m.x, m.y, t.x, t.y) < (t.r + m.r) ** 2)
-            damageMob(this, m, t.dmg * (1 + (m.dmgTakenMul || 0)), { spell: true, elem: t.elem, slow: t.slow });
+            damageMob(this, m, t.dmg, { spell: true, elem: t.elem, slow: t.slow });
         }
         this.traps.splice(i, 1);
       }
@@ -688,11 +762,23 @@ class Game {
         if (!this.floor.isBossFloor) this.nextFloor();
       }
     }
+    // вейпоинт: активация близостью (маяк зоны, телепорт из Врат)
+    const wp = this.floor.waypoint;
+    if (wp && !this.townMode) {
+      const wkey = 'a' + this.progress.act + 'f' + this.progress.floor;
+      if (!this.progress.wps) this.progress.wps = {};
+      if (!this.progress.wps[wkey] && dist2(wp.tx * TILE + 32, wp.ty * TILE + 32, h.x, h.y) < 90 * 90) {
+        this.progress.wps[wkey] = true;
+        this.ui.toast('Вейпоинт активирован', '#7fb2ff');
+        bus.emit('portal');
+        this.save();
+      }
+    }
     // зона зачищена (рукотворные этажи): баннер + бонусный опыт
     if (this.floor.zoneName && !this.floor._cleared && !this.townMode && this.floor._spawned > 0 && !this.mobs.some(m => !m.dead && m.type !== 'ally')) {
       this.floor._cleared = true;
       this.banner = { text: 'ЗОНА ЗАЧИЩЕНА', t: 3 };
-      gainXp(this, 30 + this.mobLvl * 18);
+      gainXp(this, 60 + this.mobLvl * 30);
       bus.emit('portal');
     }
     if (this.banner) { this.banner.t -= dt; if (this.banner.t <= 0) this.banner = null; }
@@ -791,6 +877,7 @@ class Game {
     for (const c of this.chestObjs) {
       list.push({ kind: 'chest', c, key: c.x + c.y });
     }
+    if (f.waypoint) list.push({ kind: 'wp', key: (f.waypoint.tx + f.waypoint.ty + 1) * TILE });
     if (f.npcs) for (const n of f.npcs) list.push({ kind: 'npc', n, key: n.x + n.y });
     if (this.townMode && this.dungeonCtx) {
       list.push({ kind: 'npc', n: { kind: 'ret', x: f.entry.cx * TILE + TILE, y: f.entry.cy * TILE + 2.2 * TILE }, key: f.entry.cx * TILE + TILE + f.entry.cy * TILE + 2.2 * TILE });
@@ -835,6 +922,9 @@ class Game {
             ctx2.globalAlpha = 1;
           }
         }
+      } else if (e.kind === 'wp') {
+        const wkey = 'a' + this.progress.act + 'f' + this.progress.floor;
+        r.drawWaypoint(f.waypoint.tx, f.waypoint.ty, !!this.progress.wps?.[wkey], timeS);
       } else if (e.kind === 'npc') r.drawNpc(this, e.n, timeS);
       else if (e.kind === 'mob') r.drawMob(this, e.m, timeS);
       else r.drawHero(this, timeS);

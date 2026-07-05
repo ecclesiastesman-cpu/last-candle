@@ -193,7 +193,8 @@ export function buildFixed(def, act, floorNum) {
   return { W, H, g, rooms: [], entry: { cx: def.entry[0], cy: def.entry[1] }, exit: { cx: def.exit[0], cy: def.exit[1] },
     decor: [], torches, spawns, chests, decals, visited, bossSpawn: null,
     act, floorNum, isBossFloor: false, propAt, propsFloor, sconces,
-    relic: def.relic ? { tx: def.relic[0], ty: def.relic[1] } : null, rares: def.rares || null, zoneName: def.name };
+    relic: def.relic ? { tx: def.relic[0], ty: def.relic[1] } : null, rares: def.rares || null,
+    waypoint: def.waypoint ? { tx: def.waypoint[0], ty: def.waypoint[1] } : null, zoneName: def.name };
 }
 
 // ---- ЛАГЕРЬ (город): рукотворная площадь с костром и NPC ----

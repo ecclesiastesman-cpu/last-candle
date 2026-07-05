@@ -28,7 +28,8 @@ export function useSkill(g, id, aimX, aimY) {
   const s = g.stats;
   if (sk.cost) h.res -= sk.cost;
   if (sk.hpCost) h.hp -= Math.round(s.maxHp * sk.hpCost);
-  h.cooldowns[id] = (sk.cd || 0) * (1 - s.cdr);
+  // GCD: даже у cd:0-умений темп ограничен скоростью атаки (иначе 60 кастов/с)
+  h.cooldowns[id] = Math.max((sk.cd || 0) * (1 - s.cdr), 1 / s.attackSpeed);
   const dx = aimX - h.x, dy = aimY - h.y, d = Math.hypot(dx, dy) || 1;
   const nx = dx / d, ny = dy / d;
   const dmg = skillDmg(g, sk, rank);
@@ -124,7 +125,10 @@ export function useSkill(g, id, aimX, aimY) {
     }
     case 'buff': {
       if (sk.healPct) healHero(g, s.maxHp * (sk.healPct + rank * .03));
-      if (sk.dur) h.buffs.push({ id, t: sk.dur, mods: sk.buff });
+      if (sk.dur) {
+        const ex = h.buffs.find(b => b.id === id);
+        if (ex) ex.t = sk.dur; else h.buffs.push({ id, t: sk.dur, mods: sk.buff });
+      }
       g.fx.buff(h.x, h.y);
       g.recalcBuffs();
       break;
@@ -174,7 +178,6 @@ export function basicAttack(g, aimX, aimY) {
   h.faceAngle = isoAngle(dx, dy);
   const isRangedA = wpn?.ranged || (wpn?.caster && (h.cls === 'mage' || h.cls === 'warlock'));
   h.action = { name: h.form ? 'swing' : isRangedA ? (wpn?.ranged ? 'shoot' : 'cast') : 'swing', t: 0 };
-  if (cls.resOnHit) h.res = Math.min(s.maxRes, h.res + cls.resOnHit);
   bus.emit('attack', h);
   const dmgRoll = () => g.rng.range(s.wDmg[0], s.wDmg[1]) * (1 + s[cls.gain.dmgStat] * .012) * (1 + s.dmgMul) + s.dmgFlat;
   const isRanged = wpn?.ranged || (wpn?.caster && (h.cls === 'mage' || h.cls === 'warlock'));
@@ -192,8 +195,12 @@ export function basicAttack(g, aimX, aimY) {
       hitAny = true;
     }
     g.fx.slash(h.x, h.y, ang, range);
-    if (hitAny) g.fx.shake(2);
+    if (hitAny) {
+      g.fx.shake(2);
+      if (cls.resOnHit) h.res = Math.min(s.maxRes, h.res + cls.resOnHit); // ресурс только за попадание
+    }
   } else {
+    if (cls.resOnHit) h.res = Math.min(s.maxRes, h.res + cls.resOnHit);
     g.projectiles.push({ from: 'hero', x: h.x, y: h.y - 14, vx: dx / d * 520, vy: dy / d * 520, r: 5,
       dmg: dmgRoll(), ttl: 1.1, pierce: 0, color: wpn?.caster ? '#b388ff' : '#f5e9c8', arrow: !wpn?.caster });
   }

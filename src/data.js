@@ -3,7 +3,7 @@
 
 export const TILE = 64;
 export const MAXLEVEL = 40;
-export const XP_CURVE = lvl => Math.floor(90 * Math.pow(lvl, 2.15)); // всего до следующего
+export const XP_CURVE = lvl => Math.floor(60 * lvl * Math.pow(1.09, lvl - 1)); // ~6*lvl убийств на уровень
 
 export const CLASSES = {
   barbarian: {
@@ -17,7 +17,7 @@ export const CLASSES = {
     weapons: ['bow'], sprite: 'hero_huntress', baseWeapon: 'wpn_bow',
   },
   mage: {
-    resource: 'mana', resMax: 120, resRegen: 6,
+    resource: 'mana', resMax: 120, resRegen: 10,
     base: { str: 8, dex: 12, int: 28, vit: 13 }, gain: { hp: 5.5, dmgStat: 'int' },
     weapons: ['staff', 'dagger'], sprite: 'hero_mage', baseWeapon: 'wpn_staff',
   },
@@ -27,7 +27,7 @@ export const CLASSES = {
     weapons: ['scythe', 'dagger', 'staff'], sprite: 'hero_warlock', baseWeapon: 'wpn_scythe',
   },
   druid: {
-    resource: 'wrath', resMax: 90, resRegen: 4,
+    resource: 'wrath', resMax: 90, resRegen: 4, resOnHit: 8,
     base: { str: 18, dex: 14, int: 18, vit: 18 }, gain: { hp: 7.5, dmgStat: 'str' },
     weapons: ['staff', 'axe'], sprite: 'hero_druid', baseWeapon: 'wpn_staff',
   },
@@ -39,8 +39,8 @@ export const CLASSES = {
 export const SKILLS = {
   // Варвар — Оружие
   cleave:    { cls: 'barbarian', br: 0, lvl: 1,  cost: 12, cd: 0,   kind: 'melee', arc: 2.4, range: 60, dmg: [1.4, .25], name: 'Рассечение', d: 'Широкий удар по дуге перед собой.' },
-  whirlwind: { cls: 'barbarian', br: 0, lvl: 6,  cost: 30, cd: 5,   kind: 'nova', range: 85, dmg: [1.7, .3], name: 'Вихрь', d: 'Круговой смерч стали вокруг себя.' },
-  leap:      { cls: 'barbarian', br: 0, lvl: 12, cost: 20, cd: 6,   kind: 'dash', range: 240, dmg: [1.2, .25], stun: .8, name: 'Прыжок', d: 'Прыжок с сотрясающим ударом, оглушает.' },
+  whirlwind: { cls: 'barbarian', br: 0, lvl: 4,  cost: 30, cd: 5,   kind: 'nova', range: 85, dmg: [1.7, .3], name: 'Вихрь', d: 'Круговой смерч стали вокруг себя.' },
+  leap:      { cls: 'barbarian', br: 0, lvl: 8, cost: 20, cd: 6,   kind: 'dash', range: 240, dmg: [1.2, .25], stun: .8, name: 'Прыжок', d: 'Прыжок с сотрясающим ударом, оглушает.' },
   execute:   { cls: 'barbarian', br: 0, lvl: 18, cost: 40, cd: 8,   kind: 'melee', arc: 1, range: 70, dmg: [3.2, .6], execBonus: .3, name: 'Казнь', d: 'Огромный урон; добивает раненых (+урон по целям <30% HP).' },
   warcry:    { cls: 'barbarian', br: 1, lvl: 3,  cost: 25, cd: 12,  kind: 'buff', dur: 8, buff: { dmgMul: .25 }, name: 'Боевой клич', d: 'Рёв ярости: +25% урона на время.' },
   terrify:   { cls: 'barbarian', br: 1, lvl: 9,  cost: 30, cd: 10,  kind: 'nova', range: 150, fear: 2.2, dmg: [.3, .1], name: 'Устрашение', d: 'Враги вокруг бегут в ужасе.' },
@@ -62,23 +62,23 @@ export const SKILLS = {
 
   // Маг
   fireball:  { cls: 'mage', br: 0, lvl: 1,  cost: 14, cd: 0,  kind: 'proj', splash: 60, elem: 'fire', dmg: [1.5, .28], name: 'Огненный шар', d: 'Взрывается о первую цель.' },
-  firewall:  { cls: 'mage', br: 0, lvl: 8,  cost: 30, cd: 7,  kind: 'zone', r: 120, ticks: 8, elem: 'fire', dmg: [.5, .12], name: 'Стена огня', d: 'Полоса пламени жжёт стоящих в ней.' },
+  firewall:  { cls: 'mage', br: 0, lvl: 5,  cost: 30, cd: 7,  kind: 'zone', r: 120, ticks: 8, elem: 'fire', dmg: [.5, .12], name: 'Стена огня', d: 'Полоса пламени жжёт стоящих в ней.' },
   meteor:    { cls: 'mage', br: 0, lvl: 16, cost: 45, cd: 9,  kind: 'zone', r: 90, delay: .8, elem: 'fire', dmg: [3.4, .6], name: 'Метеор', d: 'С неба падает пылающая скала.' },
   icebolt:   { cls: 'mage', br: 1, lvl: 3,  cost: 12, cd: 0,  kind: 'proj', slow: 1.6, elem: 'cold', dmg: [1.1, .2], name: 'Ледяная стрела', d: 'Ранит и замедляет.' },
   frostnova: { cls: 'mage', br: 1, lvl: 9,  cost: 28, cd: 8,  kind: 'nova', range: 130, freeze: 1.6, elem: 'cold', dmg: [.9, .2], name: 'Ледяная нова', d: 'Кольцо мороза сковывает врагов.' },
   shards:    { cls: 'mage', br: 1, lvl: 15, cost: 26, cd: 4,  kind: 'proj', n: 5, spread: .9, elem: 'cold', dmg: [.7, .15], name: 'Осколки льда', d: 'Веер ледяных игл.' },
   chain:     { cls: 'mage', br: 2, lvl: 5,  cost: 22, cd: 2,  kind: 'chain', jumps: 4, elem: 'light', dmg: [1.2, .24], name: 'Цепная молния', d: 'Прыгает между врагами.' },
-  teleport:  { cls: 'mage', br: 2, lvl: 11, cost: 18, cd: 5,  kind: 'dash', range: 230, dmg: [0,0], name: 'Телепорт', d: 'Мгновенное перемещение.' },
+  teleport:  { cls: 'mage', br: 2, lvl: 8, cost: 18, cd: 5,  kind: 'dash', range: 230, dmg: [0,0], name: 'Телепорт', d: 'Мгновенное перемещение.' },
   storm:     { cls: 'mage', br: 2, lvl: 18, cost: 40, cd: 10, kind: 'zone', r: 150, ticks: 10, elem: 'light', dmg: [.6, .14], name: 'Гроза', d: 'Молнии лупят область с неба.' },
 
   // Чернокнижник
   rot:       { cls: 'warlock', br: 0, lvl: 1,  cost: 10, cd: 0,  kind: 'curse', dot: [.6, .14], dur: 4, elem: 'poison', name: 'Гниение', d: 'Проклятие: плоть гниёт заживо.' },
-  weakness:  { cls: 'warlock', br: 0, lvl: 7,  cost: 20, cd: 6,  kind: 'nova', range: 160, curse: { dmgTaken: .25, dur: 6 }, dmg: [0,0], name: 'Слабость', d: 'Проклятые получают +25% урона.' },
+  weakness:  { cls: 'warlock', br: 0, lvl: 5,  cost: 20, cd: 6,  kind: 'nova', range: 160, curse: { dmgTaken: .25, dur: 6 }, dmg: [0,0], name: 'Слабость', d: 'Проклятые получают +25% урона.' },
   harvest:   { cls: 'warlock', br: 0, lvl: 14, cost: 0,  cd: 6,  kind: 'nova', range: 120, dmg: [2.0, .4], soulPerHit: 6, name: 'Жатва', d: 'Косит души: урон + запас душ.' },
   skeletons: { cls: 'warlock', br: 1, lvl: 3,  cost: 25, cd: 1,  kind: 'summon', mob: 'skeleton_minion', max: [2, .5], name: 'Восставшие', d: 'Поднимает скелетов-слуг (макс растёт).' },
   demon:     { cls: 'warlock', br: 1, lvl: 12, cost: 45, cd: 10, kind: 'summon', mob: 'demon_minion', max: [1, .25], name: 'Прислужник-демон', d: 'Призывает демона-бойца.' },
   masterY:   { cls: 'warlock', br: 1, lvl: 17, passive: { minionDmg: .2, minionHp: .2 }, name: 'Повелитель мёртвых', d: '+20% урона и HP слуг за ранг.' },
-  bloodspike:{ cls: 'warlock', br: 2, lvl: 4,  cost: 0, hpCost: .04, cd: 0, kind: 'proj', dmg: [1.7, .3], name: 'Кровавый шип', d: 'Платит жизнью — бьёт больно.' },
+  bloodspike:{ cls: 'warlock', br: 2, lvl: 4,  cost: 0, hpCost: .06, cd: 0, kind: 'proj', dmg: [1.7, .3], name: 'Кровавый шип', d: 'Платит жизнью — бьёт больно.' },
   vamp:      { cls: 'warlock', br: 2, lvl: 10, passive: { leech: .05 }, name: 'Вампиризм', d: 'Весь урон лечит тебя.' },
   sacrifice: { cls: 'warlock', br: 2, lvl: 16, cost: 0, cd: 12, kind: 'buff', dur: 6, hpCost: .2, buff: { dmgMul: .5 }, name: 'Жертва', d: 'Отдай пятую часть жизни — получи мощь.' },
 
@@ -87,7 +87,7 @@ export const SKILLS = {
   rend:      { cls: 'druid', br: 0, lvl: 6,  cost: 15, cd: 0,  kind: 'melee', form: 'wolf', arc: 1.8, range: 58, dmg: [1.3, .25], bleed: [.5, .1], name: 'Разрыв', d: '[Волк] Рвёт когтями, кровотечение.' },
   frenzy:    { cls: 'druid', br: 0, lvl: 13, cost: 30, cd: 8,  kind: 'buff', form: 'wolf', dur: 6, buff: { aspd: .4, moveMul: .2 }, name: 'Бешенство', d: '[Волк] Шквал скорости.' },
   bearform:  { cls: 'druid', br: 1, lvl: 3,  cost: 20, cd: 2,  kind: 'form', form: 'bear', name: 'Облик медведя', d: 'Живая крепость: броня и оглушение.' },
-  maul:      { cls: 'druid', br: 1, lvl: 8,  cost: 18, cd: 0,  kind: 'melee', form: 'bear', arc: 2.2, range: 66, dmg: [1.6, .3], stun: .5, name: 'Трёпка', d: '[Медведь] Тяжёлая лапа, оглушает.' },
+  maul:      { cls: 'druid', br: 1, lvl: 5,  cost: 18, cd: 0,  kind: 'melee', form: 'bear', arc: 2.2, range: 66, dmg: [1.6, .3], stun: .5, name: 'Трёпка', d: '[Медведь] Тяжёлая лапа, оглушает.' },
   roar:      { cls: 'druid', br: 1, lvl: 14, cost: 30, cd: 10, kind: 'nova', form: 'bear', range: 150, dmg: [.6, .15], slow: 2, name: 'Рёв', d: '[Медведь] Замедляет и ранит всех вокруг.' },
   roots:     { cls: 'druid', br: 2, lvl: 4,  cost: 18, cd: 5,  kind: 'zone', r: 90, ticks: 3, root: 1.5, dmg: [.5, .12], name: 'Корни', d: 'Хватают и держат врагов.' },
   swarm:     { cls: 'druid', br: 2, lvl: 10, cost: 22, cd: 4,  kind: 'proj', pierce: 3, elem: 'poison', dot: [.4, .1], dmg: [.7, .15], name: 'Рой', d: 'Туча жалящих насекомых.' },
@@ -106,12 +106,12 @@ export const MOBS = {
   knight:   { hp: 110, dmg: 18, speed: 75, r: 17, xp: 22, sprite: 'mob_knight', flare: 'e_minotaur', ai: 'melee', family: 'demon' },
   skeleton_minion: { hp: 40, dmg: 9, speed: 120, r: 12, xp: 0, sprite: 'mob_skeleton', flare: 'e_skeleton', ai: 'ally', tint: '#7fd6a0' },
   demon_minion:    { hp: 90, dmg: 16, speed: 130, r: 13, xp: 0, sprite: 'mob_imp', flare: 'e_wyvern', fscale: .8, ai: 'ally', tint: '#b388ff', scale: 1.25 },
-  boss_bone:        { hp: 950, dmg: 22, speed: 70, r: 26, xp: 300, sprite: 'boss_bone', flare: 'e_skeleton_mage', fscale: 1.8, ai: 'boss', boss: 1, skills: ['summon:skeleton', 'nova:cold'] },
+  boss_bone:        { hp: 950, dmg: 22, speed: 70, r: 26, xp: 500, sprite: 'boss_bone', flare: 'e_skeleton_mage', fscale: 1.8, ai: 'boss', boss: 1, skills: ['summon:skeleton', 'nova:cold'] },
   boss_plague:      { hp: 1500, dmg: 26, speed: 60, r: 30, xp: 500, sprite: 'boss_plague', flare: 'e_zombie', fscale: 2, tint: '#9ccc65', ai: 'boss', boss: 2, skills: ['summon:ghoul', 'zone:poison'] },
   boss_executioner: { hp: 2300, dmg: 38, speed: 95, r: 28, xp: 800, sprite: 'boss_executioner', flare: 'e_minotaur', fscale: 1.5, ai: 'boss', boss: 3, skills: ['charge', 'melee:big'] },
-  boss_abyss:       { hp: 3800, dmg: 42, speed: 85, r: 30, xp: 1500, sprite: 'boss_abyss', flare: 'e_wyvern', fscale: 1.6, tint: '#ff7043', ai: 'boss', boss: 4, skills: ['proj:fire3', 'nova:fire', 'summon:imp'] },
+  boss_abyss:       { hp: 5200, dmg: 42, speed: 85, r: 30, xp: 1500, sprite: 'boss_abyss', flare: 'e_wyvern', fscale: 1.6, tint: '#ff7043', ai: 'boss', boss: 4, skills: ['proj:fire3', 'nova:fire', 'summon:imp'] },
 };
-export const MOB_SCALE = lvl => ({ hp: Math.pow(1.17, lvl - 1), dmg: Math.pow(1.115, lvl - 1), xp: Math.pow(1.09, lvl - 1) });
+export const MOB_SCALE = lvl => ({ hp: Math.pow(1.11, lvl - 1), dmg: Math.pow(1.09, lvl - 1), xp: Math.pow(1.09, lvl - 1) });
 
 export const ACTS = {
   1: { tiles: 'tile_crypt', mobs: ['skeleton', 'zombie', 'ghoul'], boss: 'boss_bone', floors: 2, mobLvl: [1, 6], wall: '#1a1d24', fog: '#05060a', decor: ['dec_sarcophagus', 'dec_bones'] },
@@ -217,8 +217,8 @@ export const RARITY = {
   common: { c: '#c8c2b8', mult: 0, chance: 100 },
   magic:  { c: '#7aa9ff', affixes: [1, 2], chance: 34 },
   rare:   { c: '#ffd75e', affixes: [3, 5], chance: 9 },
-  set:    { c: '#61d97a', chance: 1.6 },
-  unique: { c: '#ff9840', chance: 2.4 },
+  set:    { c: '#61d97a', chance: 0.4 },
+  unique: { c: '#ff9840', chance: 0.5 },
 };
 export const POTION_HEAL = .35; // доля макс HP
 export const GAMBLE_COST = lvl => 400 + lvl * 120;

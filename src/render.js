@@ -307,6 +307,37 @@ export class Renderer {
     ctx.restore();
   }
 
+  // вейпоинт: магический круг + синее пламя-маяк
+  drawWaypoint(tx, ty, active, timeS) {
+    const { ctx } = this;
+    const cid = this.tilesMeta?.groups?.circle?.[0];
+    if (cid !== undefined) this.drawAtlasTile(cid, tx * TILE, ty * TILE);
+    const [px, py] = proj(tx * TILE + TILE / 2, ty * TILE + TILE / 2);
+    const fl = Math.sin(timeS * 6) * .15 + 1;
+    ctx.save();
+    ctx.translate(px, py);
+    ctx.globalAlpha = active ? .9 : .4;
+    const col = active ? '#7fb2ff' : '#4a5a74';
+    ctx.fillStyle = col;
+    ctx.beginPath();
+    ctx.moveTo(-9, 0); ctx.quadraticCurveTo(-10, -30 * fl, 0, -46 * fl);
+    ctx.quadraticCurveTo(10, -30 * fl, 9, 0); ctx.closePath(); ctx.fill();
+    ctx.globalAlpha = active ? .55 : .2;
+    ctx.fillStyle = '#dbe9ff';
+    ctx.beginPath();
+    ctx.moveTo(-4, 0); ctx.quadraticCurveTo(-4.5, -18 * fl, 0, -28 * fl);
+    ctx.quadraticCurveTo(4.5, -18 * fl, 4, 0); ctx.closePath(); ctx.fill();
+    // холодное свечение
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.globalAlpha = active ? .2 : .07;
+    const gl = ctx.createRadialGradient(0, -20, 4, 0, -20, 90);
+    gl.addColorStop(0, col); gl.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = gl;
+    ctx.beginPath(); ctx.arc(0, -20, 90, 0, 7); ctx.fill();
+    ctx.restore();
+    ctx.globalAlpha = 1;
+  }
+
   // стоячая жаровня с живым пламенем
   drawBrazier(wx, wy, timeS) {
     const { ctx } = this;

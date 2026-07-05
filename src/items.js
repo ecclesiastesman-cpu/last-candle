@@ -98,7 +98,7 @@ export function makeItem(rng, ilvl, opts = {}) {
 }
 
 // грубая ценность предмета для сравнения «лучше/хуже» (стрелка над дропом, как в DI)
-function itemScore(it) {
+export function itemScore(it) {
   if (!it) return 0;
   let s = 0;
   if (it.dmg) s += (it.dmg[0] + it.dmg[1]) / 2 * (it.aspd || 1) * 2.2;
@@ -164,6 +164,7 @@ export function computeStats(hero, CLASSES, SKILLS) {
   s.maxRes = cls.resMax + s.resMax + (cls.resource === 'mana' ? s.int * .8 : 0);
   s.moveSpeed = 150 * (1 + s.moveMul + s.dex * .001);
   s.critCh = Math.min(75, s.crit + s.dex * .05);
+  s.cdr = Math.min(s.cdr, .4); // кап перезарядки — иначе баффы становятся перманентными
   for (const r of ['resFire', 'resCold', 'resLight', 'resPoison']) s[r] = Math.min(75, s[r] + (s.resAll || 0));
   s.lightRadius = 320 * (1 + s.lightR);
   return s;

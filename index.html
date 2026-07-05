@@ -156,12 +156,12 @@ button.primary{background:linear-gradient(#7a5c14,#3a2a08);border-color:#d8b25a;
   box-shadow:0 12px 34px rgba(0,0,0,.7), inset 0 0 18px rgba(0,0,0,.6)}
 .dlgtext{font-size:16px;color:#cfc4a2;font-style:italic;line-height:1.55;margin:14px 6px 18px}
 /* DI-попап «Надеть?» при подборе улучшения */
-.equipprompt{position:fixed;right:calc(12px + env(safe-area-inset-right));top:34%;z-index:8;
+.equipprompt{position:fixed;left:50%;transform:translateX(-50%);top:60px;z-index:8;
   display:flex;align-items:center;gap:8px;padding:8px 10px;max-width:300px;
   background:linear-gradient(#1c160c,#0d0a05);border:1px solid #4a7a42;outline:1px solid #17110a;outline-offset:2px;
   box-shadow:0 8px 22px rgba(0,0,0,.7), inset 0 0 12px rgba(60,220,110,.08);
   animation:epin .25s ease-out}
-@keyframes epin{from{opacity:0;transform:translateX(24px)}to{opacity:1;transform:none}}
+@keyframes epin{from{opacity:0;transform:translateX(-50%) translateY(-16px)}to{opacity:1;transform:translateX(-50%)}}
 .equipprompt img{width:40px;height:40px;object-fit:contain}
 .equipprompt .epinfo{display:flex;flex-direction:column;font-size:12.5px;min-width:0}
 .equipprompt .epinfo b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-family:'Forum',Georgia,serif;font-size:14px}
