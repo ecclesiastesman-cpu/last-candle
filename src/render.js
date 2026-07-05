@@ -514,6 +514,35 @@ export class Renderer {
 
   drawEffects(g, dt, timeS) {
     const { ctx } = this;
+    // телеграфы атак: красные круги/секторы на полу (DI-стиль), заполняются к моменту удара
+    if (g.telegraphs) for (const tg of g.telegraphs) {
+      const sx = tg.src ? tg.src.x : tg.x, sy = tg.src ? tg.src.y : tg.y;
+      const [px, py] = proj(sx, sy);
+      const f = Math.min(1, tg.t / tg.dur);
+      ctx.save();
+      ctx.translate(px, py);
+      ctx.scale(ISOX, ISOY);
+      if (tg.kind === 'circle') {
+        ctx.globalAlpha = .2;
+        ctx.fillStyle = '#c62828';
+        ctx.beginPath(); ctx.arc(0, 0, tg.r, 0, 7); ctx.fill();
+        ctx.globalAlpha = .38;
+        ctx.beginPath(); ctx.arc(0, 0, tg.r * f, 0, 7); ctx.fill();
+        ctx.globalAlpha = .8; ctx.strokeStyle = '#ff5546'; ctx.lineWidth = 2.5;
+        ctx.beginPath(); ctx.arc(0, 0, tg.r, 0, 7); ctx.stroke();
+      } else { // сектор удара
+        const a0 = tg.angle - tg.spread / 2, a1 = tg.angle + tg.spread / 2;
+        ctx.globalAlpha = .2;
+        ctx.fillStyle = '#c62828';
+        ctx.beginPath(); ctx.moveTo(0, 0); ctx.arc(0, 0, tg.r, a0, a1); ctx.closePath(); ctx.fill();
+        ctx.globalAlpha = .4;
+        ctx.beginPath(); ctx.moveTo(0, 0); ctx.arc(0, 0, tg.r * f, a0, a1); ctx.closePath(); ctx.fill();
+        ctx.globalAlpha = .75; ctx.strokeStyle = '#ff5546'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(0, 0); ctx.arc(0, 0, tg.r, a0, a1); ctx.closePath(); ctx.stroke();
+      }
+      ctx.restore();
+      ctx.globalAlpha = 1;
+    }
     // зоны
     for (const z of g.zones) {
       const [zpx, zpy] = proj(z.x, z.y);
@@ -609,6 +638,16 @@ export class Renderer {
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     ctx.imageSmoothingEnabled = true;
     ctx.drawImage(lc, 0, 0, innerWidth, innerHeight);
+    // виньетка + лёгкий цветовой тон акта (склеп — холод, ад — багрянец)
+    ctx.save();
+    const vg = ctx.createRadialGradient(innerWidth / 2, innerHeight / 2, Math.min(innerWidth, innerHeight) * .42,
+      innerWidth / 2, innerHeight / 2, Math.max(innerWidth, innerHeight) * .72);
+    vg.addColorStop(0, 'rgba(0,0,0,0)');
+    vg.addColorStop(1, 'rgba(0,0,0,0.38)');
+    ctx.fillStyle = vg; ctx.fillRect(0, 0, innerWidth, innerHeight);
+    const tint = ({ 1: 'rgba(38,52,84,0.07)', 2: 'rgba(52,64,30,0.07)', 3: 'rgba(84,34,30,0.08)', 4: 'rgba(96,26,18,0.11)' })[g.floor?.act] || 'rgba(38,52,84,0.06)';
+    if (!g.townMode) { ctx.globalCompositeOperation = 'overlay'; ctx.fillStyle = tint; ctx.fillRect(0, 0, innerWidth, innerHeight); }
+    ctx.restore();
     // тёплое аддитивное свечение вокруг огня — оживляет картинку
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';

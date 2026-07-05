@@ -6,7 +6,29 @@
 и общий assets/flare/meta.json. Направления E/NE/SE зеркалятся из W/NW/SW в рантайме.
 """
 import os, sys, json, re
-from PIL import Image
+from PIL import Image, ImageEnhance, ImageFilter, ImageChops
+
+# единый грейдинг (план А): одна кривая контраста, приглушение пестроты,
+# тёплый сдвиг «свет свечи», лёгкий шарп и тёмный 1px контур для читаемости на тёмном полу
+WARM = (255, 214, 150)
+def grade_sheet(sheet, outline=True):
+    a = sheet.getchannel('A')
+    rgb = sheet.convert('RGB')
+    rgb = rgb.filter(ImageFilter.UnsharpMask(radius=1.4, percent=70, threshold=2))
+    rgb = ImageEnhance.Contrast(rgb).enhance(1.07)
+    rgb = ImageEnhance.Color(rgb).enhance(0.93)
+    mul = ImageChops.multiply(rgb, Image.new('RGB', rgb.size, WARM))
+    rgb = Image.blend(rgb, mul, 0.10)
+    out = rgb.convert('RGBA'); out.putalpha(a)
+    if not outline: return out
+    mask = a.point(lambda v: 255 if v > 40 else 0)
+    dil = mask.filter(ImageFilter.MaxFilter(3))
+    edge = ImageChops.subtract(dil, mask)
+    ol = Image.new('RGBA', sheet.size, (16, 11, 6, 255)); ol.putalpha(edge.point(lambda v: 210 if v else 0))
+    base = Image.new('RGBA', sheet.size, (0, 0, 0, 0))
+    base.alpha_composite(ol)
+    base.alpha_composite(out)
+    return base
 
 FLARE = os.environ.get('FLARE_DIR', '/tmp/claude-0/-home-user-artmore-card/032e5d9d-d2d3-5b78-a445-01d93e169192/scratchpad/flare-game/mods/fantasycore')
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -86,7 +108,8 @@ def bake(name, txt_rel, out_name=None, anims_keep=None):
                 sheet.alpha_composite(crop, (max(0, px), max(0, py)))
         col += A['frames']
     out = out_name or name
-    sheet.save(os.path.join(OUT, out + '.webp'), 'WEBP', quality=80)
+    sheet = grade_sheet(sheet)
+    sheet.save(os.path.join(OUT, out + '.webp'), 'WEBP', quality=82)
     return out, meta, sheet.size
 
 JOBS = []

@@ -375,10 +375,12 @@ export class UI {
         ady = clamp(input.aim.y - input.aim.oy, -aR, aR);
       }
       this.drawKnob(ctx, asx + adx, asy + ady, 23, true, aimOn ? 1 : .6);
-      ctx.globalAlpha = aimOn ? .95 : .55;
+      ctx.save();
+      ctx.globalAlpha = aimOn ? .95 : .6;
+      try { ctx.filter = 'brightness(0.28)'; } catch {}
       ctx.strokeStyle = '#241a06'; ctx.fillStyle = '#241a06';
-      this.drawSkillGlyph(ctx, { id: 'attack' }, asx + adx, asy + ady, 12);
-      ctx.globalAlpha = 1;
+      this.drawSkillGlyph(ctx, { id: 'attack' }, asx + adx, asy + ady, 14);
+      ctx.restore();
       // скиллы дугой над прицельным стиком
       const bar = g.hero.skillBar;
       const sock = this.skillSocket(25);
@@ -501,7 +503,25 @@ export class UI {
     return [{ id: 'attack', cmd: 'attack', glyph: 'atk' },
       ...bar.map((id, i) => ({ id, cmd: 'skill' + (i + 1), glyph: id }))].filter(b => b.id);
   }
+  // иконка умения (game-icons, CC-BY): лениво грузим, пока нет — рисуем руну
+  skillIcon(id) {
+    this._sIcons = this._sIcons || new Map();
+    let e = this._sIcons.get(id);
+    if (!e) {
+      e = { img: new Image(), ready: false };
+      e.img.onload = () => { e.ready = true; };
+      e.img.src = './assets/skills/' + id + '.webp';
+      this._sIcons.set(id, e);
+    }
+    return e.ready ? e.img : null;
+  }
   drawSkillGlyph(ctx, b, x, y, r) {
+    const icon = this.skillIcon(b.id);
+    if (icon) {
+      const s = r * 2.1;
+      ctx.drawImage(icon, x - s / 2, y - s / 2, s, s);
+      return;
+    }
     const sk = SKILLS[b.id];
     ctx.strokeStyle = '#d9cba3'; ctx.fillStyle = '#d9cba3'; ctx.lineWidth = 2;
     ctx.save(); ctx.translate(x, y);
@@ -717,7 +737,7 @@ export class UI {
         const onBar = h.skillBar.indexOf(id);
         const pips = '<span class="pips">' + '<b>' + '●'.repeat(rank) + '</b>' + '○'.repeat(5 - rank) + '</span>';
         return `<div class="talent ${locked ? 'locked' : ''} ${rank ? 'known' : ''}">
-          <div class="tname">${sk.name} ${pips}</div>
+          <div class="tname"><img class="ticon" src="./assets/skills/${id}.webp" alt="" onerror="this.remove()">${sk.name} ${pips}</div>
           <div class="tdesc">${sk.d}${sk.passive ? '' : ` · ${sk.cost || 0}⚡${sk.cd ? ` · ${sk.cd}с` : ''}`}</div>
           <div class="tdesc">${locked ? `${STR.requires} ${sk.lvl} ${STR.levelShort}` : ''}</div>
           <div>

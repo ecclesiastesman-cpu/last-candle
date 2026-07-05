@@ -64,6 +64,14 @@ for tid in TAKE:
     cx += w + 2; row_h = max(row_h, h)
 used_h = cy + row_h + 2
 atlas = atlas.crop((0, 0, MAXW, used_h))
+# единый грейдинг (план А): та же кривая, что у спрайтов, без контура
+from PIL import ImageEnhance, ImageChops
+a = atlas.getchannel('A')
+rgb = atlas.convert('RGB')
+rgb = ImageEnhance.Contrast(rgb).enhance(1.06)
+rgb = ImageEnhance.Color(rgb).enhance(0.94)
+rgb = Image.blend(rgb, ImageChops.multiply(rgb, Image.new('RGB', rgb.size, (255, 214, 150))), 0.09)
+atlas = rgb.convert('RGBA'); atlas.putalpha(a)
 atlas.save(os.path.join(OUT, 'tiles.webp'), 'WEBP', quality=85)
 
 meta = json.load(open(os.path.join(OUT, 'meta.json')))

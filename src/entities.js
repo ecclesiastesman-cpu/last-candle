@@ -39,6 +39,13 @@ export function damageMob(g, m, raw, opts = {}) {
   if (m.family === 'demon') dmg *= 1 + s.vsDemon;
   if (opts.spell) dmg *= 1 + s.spellDmg;
   m.hp -= dmg; m.hitT = .12; m.aggro = true;
+  // отдача по-DI: отбрасывание слабых, хит-стоп и встряска на критах
+  if (!m.boss && !opts.noKb) {
+    const kdx = m.x - g.hero.x, kdy = m.y - g.hero.y, kd = Math.hypot(kdx, kdy) || 1;
+    const imp = (opts.crit ? 240 : 130) * (m.elite ? .35 : 1);
+    m.kvx = (m.kvx || 0) + kdx / kd * imp; m.kvy = (m.kvy || 0) + kdy / kd * imp;
+  }
+  if (opts.crit) { g.hitStop = Math.max(g.hitStop || 0, .05); g.fx.shake(5); }
   if (s.leech > 0 && !opts.noLeech) healHero(g, dmg * s.leech);
   if (s.poisonOnHit && !opts.spell) m.dots.push({ dps: dmg * s.poisonOnHit / 3, t: 3, elem: 'poison' });
   if (opts.slow) { m.slowT = Math.max(m.slowT, opts.slow); }
@@ -55,6 +62,7 @@ export function damageMob(g, m, raw, opts = {}) {
 export function killMob(g, m) {
   if (m.dead) return; m.dead = true;
   bus.emit('mobDied', m);
+  g.hitStop = Math.max(g.hitStop || 0, m.boss ? .12 : m.elite ? .08 : .045);
   g.fx.burst(m.x, m.y, m.elite ? 22 : 12, '#8b0f23');
   if (m.flare && g.corpses) g.corpses.push({ flare: m.flare, x: m.x, y: m.y, angle: m.angle, r: m.r, fscale: m.fscale, tint: m.tint, t: 0 });
   if (m.type === 'ally') return;
@@ -138,8 +146,18 @@ export function updateMob(g, m, dt) {
     if (d.t <= 0) m.dots.splice(i, 1);
     if (m.hp <= 0) { killMob(g, m); return; }
   }
+  // отбрасывание (затухающий импульс)
+  if (m.kvx || m.kvy) {
+    const [cx, cy] = collide(g.floor, m.x + m.kvx * dt, m.y + m.kvy * dt, m.r);
+    m.x = cx; m.y = cy;
+    const dec = Math.max(0, 1 - 9 * dt);
+    m.kvx *= dec; m.kvy *= dec;
+    if (Math.abs(m.kvx) + Math.abs(m.kvy) < 6) m.kvx = m.kvy = 0;
+  }
   if (m.freezeT > 0) { m.freezeT -= dt; return; }
   if (m.stunT > 0) { m.stunT -= dt; return; }
+  // замах: стоим и телеграфируем удар, урон применит телеграф
+  if (m.windup) { m.windup -= dt; if (m.windup <= 0) m.windup = null; return; }
   const h = g.hero;
   const dx = h.x - m.x, dy = h.y - m.y, d = Math.hypot(dx, dy);
   if (!m.aggro) { if (d < 260 && losClear(g.floor, m.x, m.y, h.x, h.y)) m.aggro = true; else return; }
@@ -156,13 +174,17 @@ export function updateMob(g, m, dt) {
   if (m.fearT > 0) { m.fearT -= dt; moveMob(g, m, -dx / (d || 1), -dy / (d || 1), sp * 1.2, dt); return; }
 
   if (m.ai === 'bomber') {
-    if (d < 42) { // взрыв
-      m.hp = 0; killMob(g, m);
-      g.fx.explosion(m.x, m.y, m.boomR, '#9ccc65');
-      if (d < m.boomR) damageHero(g, m.dmg, 'poison', m.lvl);
+    if (d < 52 && !m.fused) { // фитиль: круг-телеграф, взрыв через полсекунды
+      m.fused = true;
+      m.windup = .55;
+      g.telegraphs.push({ kind: 'circle', x: m.x, y: m.y, r: m.boomR, t: 0, dur: .55, hit: () => {
+        m.hp = 0; killMob(g, m);
+        g.fx.explosion(m.x, m.y, m.boomR, '#9ccc65');
+        if (dist2(m.x, m.y, g.hero.x, g.hero.y) < m.boomR * m.boomR) damageHero(g, m.dmg, 'poison', m.lvl);
+      } });
       return;
     }
-    moveMob(g, m, dx / d, dy / d, sp, dt);
+    if (!m.fused) moveMob(g, m, dx / d, dy / d, sp, dt);
   } else if (m.ai === 'caster') {
     if (d > 420) { moveMob(g, m, dx / d, dy / d, sp, dt); }
     else if (d < 140) { moveMob(g, m, -dx / d, -dy / d, sp * .8, dt); }
@@ -179,13 +201,21 @@ export function updateMob(g, m, dt) {
     if (m.lunge && d < 200 && d > 70 && m.cd <= 0) { m.vx = dx / d * 520; m.vy = dy / d * 520; m.lungeT = .25; m.cd = 2.5; }
     if (m.lungeT > 0) { m.lungeT -= dt; moveMob(g, m, m.vx / 520, m.vy / 520, 520, dt); }
     else if (d > m.r + 16) moveMob(g, m, dx / d, dy / d, sp, dt);
-    if (d < m.r + 22 && m.cd <= 0) {
-      m.cd = 1.1;
+    if (d < m.r + 26 && m.cd <= 0) {
+      // замах 0.42с с красным сектором — можно выйти из-под удара
+      m.cd = 1.25;
+      m.windup = .42;
       m.action = { name: 'swing', t: 0 };
-      const dealt = damageHero(g, m.dmg, m.elem, m.lvl);
-      if (dealt) thornsBack(g, m);
-      if (m.leech) m.hp = Math.min(m.maxHp, m.hp + dealt * m.leech);
-      bus.emit('mobAttack', m);
+      const ang = Math.atan2(dy, dx);
+      g.telegraphs.push({ kind: 'arc', src: m, r: m.r + 52, angle: ang, spread: 1.6, t: 0, dur: .42, hit: () => {
+        if (m.dead) return;
+        const hh = g.hero, ddx = hh.x - m.x, ddy = hh.y - m.y, dd = Math.hypot(ddx, ddy);
+        if (dd > m.r + 52 || Math.abs(((Math.atan2(ddy, ddx) - ang + Math.PI * 3) % (Math.PI * 2)) - Math.PI) > .8) return;
+        const dealt = damageHero(g, m.dmg, m.elem, m.lvl);
+        if (dealt) thornsBack(g, m);
+        if (m.leech) m.hp = Math.min(m.maxHp, m.hp + dealt * m.leech);
+        bus.emit('mobAttack', m);
+      } });
     }
   }
   // сепарация от других монстров (дёшево: каждые несколько кадров)
@@ -237,10 +267,17 @@ function updateBoss(g, m, dt, d, dx, dy) {
   const sp = m.speed * (enraged ? 1.35 : 1) * (m.slowT > 0 ? .6 : 1);
   if (d > m.r + 26) moveMob(g, m, dx / d, dy / d, sp, dt);
   else if (m.cd <= 0) {
-    m.cd = enraged ? .8 : 1.2;
+    m.cd = enraged ? .9 : 1.3;
+    m.windup = .5;
     m.action = { name: 'swing', t: 0 };
-    const dealt = damageHero(g, m.dmg, m.elem, m.lvl);
-    if (dealt) thornsBack(g, m);
+    const ang = Math.atan2(dy, dx);
+    g.telegraphs.push({ kind: 'arc', src: m, r: m.r + 64, angle: ang, spread: 1.9, t: 0, dur: .5, hit: () => {
+      if (m.dead) return;
+      const hh = g.hero, ddx = hh.x - m.x, ddy = hh.y - m.y, dd = Math.hypot(ddx, ddy);
+      if (dd > m.r + 64 || Math.abs(((Math.atan2(ddy, ddx) - ang + Math.PI * 3) % (Math.PI * 2)) - Math.PI) > .95) return;
+      const dealt = damageHero(g, m.dmg, m.elem, m.lvl);
+      if (dealt) thornsBack(g, m);
+    } });
   }
   m.skillCd = (m.skillCd ?? 3) - dt;
   if (m.skillCd <= 0 && m.skills) {
@@ -254,8 +291,13 @@ function updateBoss(g, m, dt, d, dx, dy) {
       }
       bus.emit('bossSummon', m);
     } else if (kind === 'nova') {
-      g.fx.explosion(m.x, m.y, 190, arg === 'cold' ? '#4fc3f7' : '#ff7043');
-      if (d < 190) { damageHero(g, m.dmg * 1.2, arg, m.lvl); if (arg === 'cold') h.slowT = 2; }
+      // большая нова — телеграф 0.8с, из круга можно выбежать
+      m.windup = .8;
+      g.telegraphs.push({ kind: 'circle', src: m, r: 190, t: 0, dur: .8, hit: () => {
+        if (m.dead) return;
+        g.fx.explosion(m.x, m.y, 190, arg === 'cold' ? '#4fc3f7' : '#ff7043');
+        if (dist2(m.x, m.y, h.x, h.y) < 190 * 190) { damageHero(g, m.dmg * 1.2, arg, m.lvl); if (arg === 'cold') h.slowT = 2; }
+      } });
     } else if (kind === 'zone') {
       g.zones.push({ from: 'mob', x: h.x, y: h.y, r: 95, t: 4, tickT: 0, dps: m.dmg * .5, elem: 'poison', color: '#9ccc65', lvl: m.lvl });
     } else if (kind === 'charge') {

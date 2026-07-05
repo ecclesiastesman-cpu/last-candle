@@ -1,5 +1,5 @@
 // Service Worker: полный прекэш — игра работает без сети после первого открытия.
-const VERSION = 'lastcandle-v10';
+const VERSION = 'lastcandle-v11';
 const CORE = [
   './', './index.html', './manifest.webmanifest',
   './src/main.js', './src/core.js', './src/data.js', './src/strings.js', './src/items.js',
@@ -13,6 +13,12 @@ const LOOT = ['hand_axe', 'battle_axe', 'great_axe', 'greatsword', 'sword', 'sho
   'leather_gloves', 'chain_gloves', 'plate_gloves', 'belt2', 'leather_boots', 'chain_boots', 'plate_boots',
   'amu_green', 'amu_red', 'amu_blue', 'ring_silver', 'ring_gold', 'ring_ruby',
   'coins', 'hp_flask', 'gem_red'].map(n => './assets/loot/' + n + '.webp');
+const SKILLICONS = ['cleave', 'whirlwind', 'leap', 'execute', 'warcry', 'terrify', 'bloodcry', 'ironskin', 'thorns', 'secondwind',
+  'multishot', 'pierce', 'volley', 'firetrap', 'frosttrap', 'blasttrap', 'dash', 'poison', 'deadeye',
+  'fireball', 'firewall', 'meteor', 'icebolt', 'frostnova', 'shards', 'chain', 'teleport', 'storm',
+  'rot', 'weakness', 'harvest', 'skeletons', 'demon', 'masterY', 'bloodspike', 'vamp', 'sacrifice',
+  'wolfform', 'rend', 'frenzy', 'bearform', 'maul', 'roar', 'roots', 'swarm', 'heal', 'attack', 'potion'
+].map(n => './assets/skills/' + n + '.webp');
 const FLARE = ['e_skeleton', 'e_skeleton_mage', 'e_zombie', 'e_goblin', 'e_antlion', 'e_minotaur', 'e_wyvern',
   'n_trader', 'n_guild',
   'm_default_feet', 'm_default_legs', 'm_default_hands', 'm_default_chest', 'm_head_short',
@@ -39,7 +45,7 @@ self.addEventListener('install', e => {
     const cache = await caches.open(VERSION);
     // ядро обязано закэшироваться; ассеты — сколько получится (отсутствующие не валят установку)
     await cache.addAll(CORE);
-    await Promise.allSettled([...ASSETS, ...FLARE, ...LOOT].map(u => cache.add(u)));
+    await Promise.allSettled([...ASSETS, ...FLARE, ...LOOT, ...SKILLICONS].map(u => cache.add(u)));
     self.skipWaiting();
   })());
 });

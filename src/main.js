@@ -194,6 +194,7 @@ class Game {
     h.y = this.floor.entry.cy * TILE + TILE / 2;
     h.dead = false; h.deadT = 0;
     this.mobs = []; this.projectiles = []; this.zones = []; this.traps = []; this.drops = []; this.corpses = [];
+    this.telegraphs = [];
     this.chestObjs = [];
     this.townMode = true;
     this.rebuildHeroSheet();
@@ -224,6 +225,7 @@ class Game {
     this.hero.x = c.x; this.hero.y = c.y;
     this.townMode = false;
     this.dungeonCtx = null;
+    this.telegraphs = [];
     const [cpx, cpy] = proj(this.hero.x, this.hero.y);
     this.renderer.cam.px = cpx; this.renderer.cam.py = cpy;
     bus.emit('portal');
@@ -253,6 +255,7 @@ class Game {
     h.x = this.floor.entry.cx * TILE + TILE / 2; h.y = this.floor.entry.cy * TILE + TILE / 2;
     h.dead = false;
     this.mobs = []; this.projectiles = []; this.zones = []; this.traps = []; this.drops = []; this.corpses = [];
+    this.telegraphs = [];
     // предзагрузка листов монстров акта + слуг
     if (this.flare?.meta) {
       const names = new Set(['e_skeleton', 'e_wyvern']);
@@ -388,7 +391,15 @@ class Game {
   update(dt, cmds) {
     this.time += dt;
     if (this.state !== 'dungeon') return; // меню — DOM-панели
+    // хит-стоп: короткая заморозка мира на крите/убийстве (сочность как в DI)
+    if (this.hitStop > 0) { this.hitStop -= dt; return; }
     const h = this.hero, s = this.stats;
+    // телеграфы атак: по истечении замаха — применить удар
+    if (this.telegraphs) for (let i = this.telegraphs.length - 1; i >= 0; i--) {
+      const tg = this.telegraphs[i];
+      tg.t += dt;
+      if (tg.t >= tg.dur) { this.telegraphs.splice(i, 1); if (tg.hit) tg.hit(); }
+    }
     for (let i = this.corpses.length - 1; i >= 0; i--) { this.corpses[i].t += dt; if (this.corpses[i].t > 4) this.corpses.splice(i, 1); }
     if (h.dead) { h.deadT = (h.deadT || 0) + dt; return; }
     h.animT += dt;
