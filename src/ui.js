@@ -291,19 +291,36 @@ export class UI {
     const touch = g.isTouch;
     const timeS = g.time;
     const safeB = 16;
+    // лендскейп-first: телефон держат горизонтально — орбы внутрь от стиков
+    const land = W > H * 1.15;
+    const SL = land ? 34 : 0; // сейф-поля под чёлку iPhone
     ctx.font = '13px Georgia, serif';
+    const orbR = land ? 40 : touch ? 37 : 42;
+    let hpPos, mpPos, lsHome, asHome, potPos;
+    if (land && touch) {
+      lsHome = [SL + 112, H - 102];
+      asHome = [W - SL - 112, H - 102];
+      hpPos = [SL + 264, H - orbR - 14];
+      mpPos = [W - SL - 264, H - orbR - 14];
+      potPos = [SL + 264 + orbR + 34, H - 42];
+    } else {
+      lsHome = [96, H - 148 - safeB];
+      asHome = [W - 96, H - 148 - safeB];
+      hpPos = [orbR + 14, H - orbR - 16 - safeB / 2];
+      mpPos = [W - orbR - 14, H - orbR - 16 - safeB / 2];
+      potPos = [orbR * 2 + 52, H - 48 - safeB];
+    }
     // ОРБЫ (стекло + камень)
-    const orbR = touch ? 37 : 42;
     const resCol = {
       fury: ['#ff7a2e', '#7f2c00'], focus: ['#cdd45a', '#4a4a10'], mana: ['#3d8bff', '#0a2e63'],
       souls: ['#a55cff', '#320d49'], wrath: ['#5cd162', '#123615'],
     }[g.cls.resource];
-    this.drawOrb(ctx, orbR + 14, H - orbR - 16 - safeB / 2, orbR, clamp(h.hp / s.maxHp, 0, 1),
+    this.drawOrb(ctx, hpPos[0], hpPos[1], orbR, clamp(h.hp / s.maxHp, 0, 1),
       '#e0402e', '#5e0a0a', Math.ceil(h.hp), timeS, h.hp < s.maxHp * .3);
-    this.drawOrb(ctx, W - orbR - 14, H - orbR - 16 - safeB / 2, orbR, clamp(h.res / s.maxRes, 0, 1),
+    this.drawOrb(ctx, mpPos[0], mpPos[1], orbR, clamp(h.res / s.maxRes, 0, 1),
       resCol[0], resCol[1], Math.ceil(h.res), timeS, false);
     // XP: золочёный жёлоб с насечками
-    const xw = W * .44, xx = W / 2 - xw / 2, xy = H - 9;
+    const xw = W * (land ? .26 : .44), xx = W / 2 - xw / 2, xy = H - 9;
     ctx.fillStyle = 'rgba(0,0,0,0.72)';
     ctx.beginPath(); ctx.roundRect(xx - 2, xy - 2, xw + 4, 9, 4); ctx.fill();
     ctx.strokeStyle = 'rgba(140,109,31,0.5)'; ctx.lineWidth = 1; ctx.stroke();
@@ -336,7 +353,7 @@ export class UI {
     if (touch) {
       // левый стик
       const lR = 52;
-      const lsx = input.stick.active ? input.stick.ox : 96, lsy = input.stick.active ? input.stick.oy : H - 148 - safeB;
+      const lsx = input.stick.active ? input.stick.ox : lsHome[0], lsy = input.stick.active ? input.stick.oy : lsHome[1];
       const lb = this.stickBase(lR, false);
       ctx.globalAlpha = input.stick.active ? .85 : .42;
       ctx.drawImage(lb, lsx - lb.width / 2, lsy - lb.height / 2);
@@ -346,7 +363,7 @@ export class UI {
       this.drawKnob(ctx, lsx + ldx, lsy + ldy, 24, false, input.stick.active ? .95 : .5);
       // правый стик прицеливания
       const aR = 46;
-      const asx = W - 96, asy = H - 148 - safeB;
+      const asx = asHome[0], asy = asHome[1];
       const aimOn = input.aim.active;
       const ab = this.stickBase(aR, true);
       ctx.globalAlpha = aimOn ? .95 : .5;
@@ -367,8 +384,9 @@ export class UI {
       const sock = this.skillSocket(25);
       bar.forEach((id, i) => {
         if (!id) return;
-        const ang = Math.PI * (1.02 + i * .17);
-        const pos = { x: asx + Math.cos(ang) * 108, y: asy + Math.sin(ang) * 108 };
+        const ang = land ? Math.PI * (1.12 + i * .195) : Math.PI * (1.02 + i * .17);
+        const rad = land ? 100 : 108;
+        const pos = { x: asx + Math.cos(ang) * rad, y: asy + Math.sin(ang) * rad };
         input.addButton('sk' + (i + 1), pos.x, pos.y, 26, 'skill' + (i + 1));
         const usable = canUse(g, id);
         ctx.globalAlpha = usable ? 1 : .38;
@@ -387,7 +405,7 @@ export class UI {
         ctx.globalAlpha = 1;
       });
       // зелье-колба у орба HP
-      const px = orbR * 2 + 52, py = H - 48 - safeB;
+      const px = potPos[0], py = potPos[1];
       input.addButton('potion', px, py, 26, 'potion');
       const hasPot = h.potionCharges > 0;
       ctx.save();
@@ -430,7 +448,7 @@ export class UI {
       ctx.fillStyle = '#ffd75e'; ctx.beginPath(); ctx.arc(W - 12, 46, 5, 0, 7); ctx.fill();
     }
     // миникарта
-    this.drawMinimap(ctx, g, W);
+    this.drawMinimap(ctx, g, W, land);
     // босс-бар
     const boss = g.mobs.find(m => m.boss && !m.dead && m.aggro);
     if (boss) {
@@ -444,11 +462,11 @@ export class UI {
       ctx.fillText(STR.mobNames[boss.kind] || '', W / 2, 50);
     }
   }
-  drawMinimap(ctx, g, W) {
+  drawMinimap(ctx, g, W, land) {
     const f = g.floor;
     if (!f) return;
-    const size = 96, cell = size / Math.max(f.W, f.H);
-    const mx = W - size - 10, my = 84;
+    const size = land ? 82 : 96, cell = size / Math.max(f.W, f.H);
+    const mx = W - size - (land ? 58 : 10), my = land ? 46 : 84;
     ctx.save();
     ctx.globalAlpha = .82;
     ctx.fillStyle = 'rgba(6,5,3,0.75)';
@@ -589,6 +607,7 @@ export class UI {
     const hint = ctx === 'bag' ? `<div class="tthint">двойной тап по предмету — надеть</div>`
       : ctx === 'equip' ? `<div class="tthint">двойной тап — снять</div>` : '';
     return `<div class="tt">
+      <button class="ttclose" data-act="closett">✕</button>
       <div class="ttname" style="color:${RC[it.rarity]}">${esc(it.name)}</div>
       ${it.typeName ? `<div class="ttt">${esc(it.typeName)}</div>` : ''}
       <div class="ttreq">${STR.requires}: ${it.req} ${STR.levelShort} · ${it.price} ✦</div>
@@ -640,17 +659,23 @@ export class UI {
     const doll = this.heroDollUrl();
     const S = sl => h.equip[sl] ? this.itemHtml(h.equip[sl], 'equip') : this.emptyCell(STR.slots[sl]);
     return `${this.tabs('inventory')}
-    <div class="paperdoll">
-      <div class="dcol">${S('helm')}${S('weapon')}${S('gloves')}${S('ring1')}</div>
-      <div class="dollimg">${doll ? `<img src="${doll}" alt="">` : ''}</div>
-      <div class="dcol">${S('amulet')}${S('offhand')}${S('chest')}${S('ring2')}</div>
+    <div class="invwrap">
+    <div class="invleft">
+      <div class="paperdoll">
+        <div class="dcol">${S('helm')}${S('weapon')}${S('gloves')}${S('ring1')}</div>
+        <div class="dollimg">${doll ? `<img src="${doll}" alt="">` : ''}</div>
+        <div class="dcol">${S('amulet')}${S('offhand')}${S('chest')}${S('ring2')}</div>
+      </div>
+      <div class="paperdoll beltrow" style="grid-template-columns:1fr;padding:6px">
+        <div class="dcol" style="flex-direction:row">${S('belt')}${S('boots')}
+          <span class="gold" style="margin-left:auto">${h.gold} <span style="color:#ffd75e">✦</span></span></div>
+      </div>
     </div>
-    <div class="paperdoll" style="grid-template-columns:1fr;padding:6px">
-      <div class="dcol" style="flex-direction:row">${S('belt')}${S('boots')}
-        <span class="gold" style="margin-left:auto">${h.gold} <span style="color:#ffd75e">✦</span></span></div>
+    <div class="invright">
+      <div class="h2">${STR.inventory} (${h.inventory.length}/24)</div>
+      <div class="grid">${h.inventory.map(it => this.itemHtml(it, 'bag')).join('')}${Array(Math.max(0, 24 - h.inventory.length)).fill('<div class="cell empty"></div>').join('')}</div>
     </div>
-    <div class="h2">${STR.inventory} (${h.inventory.length}/24)</div>
-    <div class="grid">${h.inventory.map(it => this.itemHtml(it, 'bag')).join('')}${Array(Math.max(0, 24 - h.inventory.length)).fill('<div class="cell empty"></div>').join('')}</div>
+    </div>
     <div id="ttbox"></div>`;
   }
   rCharacter() {
@@ -757,15 +782,19 @@ export class UI {
     if (!g.vendorStock.length) g.restockVendor();
     return `<div class="tabs"><div class="h1">${STR.vendor}</div><button class="tab x" data-act="town">←</button></div>
     <div class="gold">${STR.gold}: <b>${h.gold} ✦</b> · <button data-act="gamble">${STR.gamble} (${GAMBLE_COST(h.level)} ✦)</button></div>
-    <div class="h2">${STR.buy}</div><div class="grid">${g.vendorStock.map(it => this.itemHtml(it, 'shop')).join('')}</div>
-    <div class="h2">${STR.sell}</div><div class="grid">${h.inventory.map(it => this.itemHtml(it, 'sellbag')).join('') || '<span class="empty">пусто</span>'}</div>
+    <div class="invwrap">
+      <div class="invleft"><div class="h2">${STR.buy}</div><div class="grid">${g.vendorStock.map(it => this.itemHtml(it, 'shop')).join('')}</div></div>
+      <div class="invright"><div class="h2">${STR.sell}</div><div class="grid">${h.inventory.map(it => this.itemHtml(it, 'sellbag')).join('') || '<span class="empty">пусто</span>'}</div></div>
+    </div>
     <div id="ttbox"></div>`;
   }
   rStash() {
     const g = this.g, h = g.hero;
     return `<div class="tabs"><div class="h1">${STR.stash} (${g.stash.length}/48)</div><button class="tab x" data-act="town">←</button></div>
-    <div class="h2">${STR.stash}</div><div class="grid">${g.stash.map(it => this.itemHtml(it, 'stash')).join('')}${Array(Math.max(0, 48 - g.stash.length)).fill('<div class="cell empty"></div>').join('')}</div>
-    <div class="h2">${STR.inventory}</div><div class="grid">${h.inventory.map(it => this.itemHtml(it, 'tostash')).join('') || '<span class="empty">пусто</span>'}</div>
+    <div class="invwrap">
+      <div class="invleft"><div class="h2">${STR.stash}</div><div class="grid">${g.stash.map(it => this.itemHtml(it, 'stash')).join('')}${Array(Math.max(0, 48 - g.stash.length)).fill('<div class="cell empty"></div>').join('')}</div></div>
+      <div class="invright"><div class="h2">${STR.inventory}</div><div class="grid">${h.inventory.map(it => this.itemHtml(it, 'tostash')).join('') || '<span class="empty">пусто</span>'}</div></div>
+    </div>
     <div id="ttbox"></div>`;
   }
   rDeath() {
@@ -793,6 +822,7 @@ export class UI {
       const find = (arr, iid) => arr.find(x => x.id == iid);
       switch (act) {
         case 'close': this.closeScreen(); break;
+        case 'closett': { const box = this.root.querySelector('#ttbox'); if (box) box.style.display = 'none'; break; }
         case 'tab': this.open(id); break;
         case 'mainmenu': this.confirmWipe = false; g.state = 'title'; this.open('mainmenu'); break;
         case 'continue': g.doContinue(); break;
