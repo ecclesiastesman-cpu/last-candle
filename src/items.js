@@ -97,6 +97,30 @@ export function makeItem(rng, ilvl, opts = {}) {
   function cap(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
 }
 
+// грубая ценность предмета для сравнения «лучше/хуже» (стрелка над дропом, как в DI)
+function itemScore(it) {
+  if (!it) return 0;
+  let s = 0;
+  if (it.dmg) s += (it.dmg[0] + it.dmg[1]) / 2 * (it.aspd || 1) * 2.2;
+  if (it.armor) s += it.armor * 1.6;
+  for (const k in it.stats || {}) {
+    const v = it.stats[k];
+    s += Math.abs(v) < 1 ? v * 40 : v * 1.2; // проценты весят больше плоских
+  }
+  return s;
+}
+// предмет лучше надетого в своём слоте? (пустой слот = всегда улучшение)
+export function isUpgrade(hero, it) {
+  if (!it || !it.slot) return false;
+  if (hero.level < it.req) return false;
+  let slot = it.slot;
+  if (slot === 'ring') {
+    const a = itemScore(hero.equip.ring1), b = itemScore(hero.equip.ring2);
+    return itemScore(it) > Math.min(a, b) + 1;
+  }
+  return itemScore(it) > itemScore(hero.equip[slot]) + 1;
+}
+
 // Сводные статы героя из базы + шмота + пассивок + баффов.
 export function computeStats(hero, CLASSES, SKILLS) {
   const cls = CLASSES[hero.cls];

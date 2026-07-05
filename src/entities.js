@@ -95,6 +95,12 @@ export function killMob(g, m) {
     itemCh -= 1;
   }
   if (rng.chance(m.boss ? 1 : .05)) g.drops.push({ kind: 'potion', x: m.x, y: m.y + 10, t: 0 });
+  // сфера жизни (как в DI): шанс с обычных, всегда с элиток и боссов
+  if (m.boss || m.elite || rng.chance(.12)) g.drops.push({ kind: 'globe', x: m.x + rng.range(-16, 16), y: m.y + rng.range(-10, 18), t: 0 });
+  if (m.name) { // именной редкий: гарантированный магический+ дроп
+    const it2 = makeItem(rng, m.lvl + 1, { magicFind: 1.2 });
+    g.drops.push({ kind: 'item', x: m.x, y: m.y + 14, item: it2, t: 0 });
+  }
   if (m.boss) bus.emit('bossDied', m);
 }
 
@@ -107,10 +113,26 @@ export function gainXp(g, xp) {
     h.xp -= h.xpNext; h.level++;
     h.xpNext = g.xpCurve(h.level);
     h.statPts += 5; h.talentPts += 1;
+    unlockSkills(g);
     g.recalc();
     h.hp = g.stats.maxHp; h.res = g.stats.maxRes;
     g.fx.levelUp(h.x, h.y);
     bus.emit('levelUp', h.level);
+  }
+}
+
+// DI-разблокировка: умения открываются уровнями сами (ранг 1),
+// очки талантов дальше усиливают их до ранга 5
+export function unlockSkills(g) {
+  const h = g.hero;
+  for (const id in SKILLS) {
+    const sk = SKILLS[id];
+    if (sk.cls !== h.cls || sk.lvl > h.level) continue;
+    if (h.talents[id]) continue;
+    h.talents[id] = 1;
+    if (!sk.passive && h.skillBar.length < 4 && !h.skillBar.includes(id)) h.skillBar.push(id);
+    bus.emit('skillUnlocked', sk);
+    g.ui?.toast(`Новое умение: ${sk.name}`, '#7fd68a');
   }
 }
 

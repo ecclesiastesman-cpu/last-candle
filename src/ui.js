@@ -18,6 +18,24 @@ export class UI {
     bus.on('levelUp', lvl => this.toast(`${STR.levelUp} ${lvl}`, '#ffd75e'));
     bus.on('pickupItem', (r, name) => { if (r !== 'common') this.toast(name, RC[r]); });
   }
+  // DI-попап: подобрано улучшение — «Надеть?» одним тапом
+  equipPrompt(it) {
+    this.root.querySelector('.equipprompt')?.remove();
+    const el = document.createElement('div');
+    el.className = 'equipprompt';
+    el.innerHTML = `<img src="./assets/${esc(it.icon)}.webp" alt="">
+      <div class="epinfo"><b style="color:${RC[it.rarity]}">${esc(it.name)}</b><span>лучше надетого</span></div>
+      <button class="primary" data-ep="equip">Надеть</button><button data-ep="no">✕</button>`;
+    el.style.pointerEvents = 'auto';
+    el.addEventListener('click', e => {
+      const b = e.target.closest('[data-ep]');
+      if (!b) return;
+      if (b.dataset.ep === 'equip') { this.g.equipItem(it.id); this.toast(it.name, RC[it.rarity]); }
+      el.remove();
+    });
+    this.root.appendChild(el);
+    setTimeout(() => el.remove(), 7000);
+  }
   toast(txt, color = '#e0d9c8') {
     const el = document.createElement('div');
     el.className = 'toast'; el.textContent = txt; el.style.color = color;
@@ -449,6 +467,20 @@ export class UI {
     ctx.fillStyle = '#e8dcc0'; ctx.textAlign = 'center'; ctx.font = '15px Georgia'; ctx.fillText('\u2630', W - 26, 65);
     if (g.hero.statPts > 0 || g.hero.talentPts > 0) {
       ctx.fillStyle = '#ffd75e'; ctx.beginPath(); ctx.arc(W - 12, 46, 5, 0, 7); ctx.fill();
+    }
+    // баннер зоны (зачистка)
+    if (g.banner) {
+      const a = Math.min(1, g.banner.t, (3 - g.banner.t) * 2);
+      ctx.save();
+      ctx.globalAlpha = a;
+      ctx.font = `bold ${Math.min(44, W * .05)}px Forum, Georgia, serif`;
+      ctx.textAlign = 'center';
+      ctx.shadowColor = '#b9781f'; ctx.shadowBlur = 22;
+      ctx.strokeStyle = 'rgba(0,0,0,0.85)'; ctx.lineWidth = 5;
+      ctx.strokeText(g.banner.text, W / 2, H * .3);
+      ctx.fillStyle = '#ffd75e';
+      ctx.fillText(g.banner.text, W / 2, H * .3);
+      ctx.restore();
     }
     // трекер задания (акт 1)
     const q = g.quest;

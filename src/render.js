@@ -460,6 +460,14 @@ export class Renderer {
     }
     ctx.restore();
     ctx.filter = 'none'; ctx.globalAlpha = 1;
+    if (m.name) { // именной редкий: табличка
+      const [npx, npy] = proj(m.x, m.y);
+      ctx.font = 'bold 12px Georgia, serif'; ctx.textAlign = 'center';
+      ctx.strokeStyle = 'rgba(0,0,0,0.85)'; ctx.lineWidth = 3;
+      ctx.strokeText(m.name, npx, npy - size * .7);
+      ctx.fillStyle = '#ffd54f';
+      ctx.fillText(m.name, npx, npy - size * .7);
+    }
     if (m.hp < m.maxHp && !m.boss) { // полоска HP
       const [bpx, bpy] = proj(m.x, m.y);
       const w = m.r * 2.4;
@@ -475,7 +483,16 @@ export class Renderer {
       const bounce = Math.max(0, Math.sin(Math.min(d.t * 6, Math.PI))) * 14;
       const [dpx, dpyRaw] = proj(d.x, d.y);
       const y = dpyRaw - bounce;
-      if (d.kind === 'gold') {
+      if (d.kind === 'globe') { // сфера жизни (как в DI): красный пульсирующий шар
+        const pul = 1 + Math.sin(timeS * 5 + d.x) * .12;
+        ctx.save();
+        ctx.shadowColor = '#ff3b30'; ctx.shadowBlur = 14;
+        const gg = ctx.createRadialGradient(dpx - 3, y - 3, 1, dpx, y, 9 * pul);
+        gg.addColorStop(0, '#ff9a8a'); gg.addColorStop(.55, '#e0281e'); gg.addColorStop(1, '#7a0e08');
+        ctx.fillStyle = gg;
+        ctx.beginPath(); ctx.arc(dpx, y, 9 * pul, 0, 7); ctx.fill();
+        ctx.restore();
+      } else if (d.kind === 'gold') {
         const gi = this.assets['loot/coins'];
         if (gi) ctx.drawImage(gi, dpx - 11, y - 14, 22, 22);
         else { ctx.fillStyle = '#ffd75e'; ctx.beginPath(); ctx.arc(dpx, y, 5, 0, 7); ctx.fill(); }
@@ -497,6 +514,17 @@ export class Renderer {
           grad.addColorStop(0, 'rgba(255,255,255,0)');
           grad.addColorStop(1, col + 'aa');
           ctx.fillStyle = grad; ctx.fillRect(dpx - 2, y - 70, 4, 70);
+        }
+        // DI-стиль: зелёная стрелка «лучше надетого»
+        if (d.item._up) {
+          const bob2 = Math.sin(timeS * 5) * 3;
+          ctx.save();
+          ctx.translate(dpx + 16, y - 24 + bob2);
+          ctx.fillStyle = '#4ade63';
+          ctx.strokeStyle = 'rgba(6,40,12,0.9)'; ctx.lineWidth = 1.5;
+          ctx.beginPath(); ctx.moveTo(0, -8); ctx.lineTo(7, 2); ctx.lineTo(2.6, 2); ctx.lineTo(2.6, 9); ctx.lineTo(-2.6, 9); ctx.lineTo(-2.6, 2); ctx.lineTo(-7, 2); ctx.closePath();
+          ctx.fill(); ctx.stroke();
+          ctx.restore();
         }
         // D2-стиль: подпись предмета на полу (редкие+ всегда, прочие — рядом с героем)
         const near = Math.abs(d.x - g.hero.x) < 150 && Math.abs(d.y - g.hero.y) < 150;

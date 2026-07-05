@@ -4,9 +4,9 @@ import { TILE, CLASSES, SKILLS, ACTS, MOBS, XP_CURVE, POTION_HEAL, DEATH_GOLD_LO
 import { makeRng, Input, bus, clamp, dist2, proj, unprojDir, isoAngle } from './core.js';
 import { genFloor, genTown, buildFixed, collide, T_EXIT } from './world.js';
 import { ACT1_MAPS, QUESTS } from './act1.js';
-import { makeMob, updateMob, damageMob, damageHero, healHero, gainXp } from './entities.js';
+import { makeMob, updateMob, damageMob, damageHero, healHero, gainXp, unlockSkills } from './entities.js';
 import { useSkill, basicAttack, autoAim, canUse } from './skills.js';
-import { makeItem, computeStats, newUid, setUidBase, refreshIcon } from './items.js';
+import { makeItem, computeStats, newUid, setUidBase, refreshIcon, isUpgrade } from './items.js';
 import { SETS } from './data.js';
 import { Renderer } from './render.js';
 import { UI } from './ui.js';
@@ -126,6 +126,7 @@ class Game {
     const it = makeItem(this.rng, 1, { base: baseW, rarity: 'common' });
     this.hero.equip.weapon = it;
     this.cls = CLASSES[cls];
+    unlockSkills(this);
     this.recalc();
     this.rebuildHeroSheet();
     this.hero.hp = this.stats.maxHp;
@@ -293,6 +294,13 @@ class Game {
         if (p.rift) { m.maxHp *= 1 + p.riftLvl * .12; m.hp = m.maxHp; m.dmg *= 1 + p.riftLvl * .08; }
         this.mobs.push(m);
       }
+    }
+    this.floor._spawned = this.mobs.length;
+    // именные редкие (мини-боссы зоны)
+    if (this.floor.rares) for (const rr of this.floor.rares) {
+      const m = makeMob(this.frng, rr.kind, rr.tx * TILE + 32, rr.ty * TILE + 32, mobLvl + 1, this.frng.pick(['fast', 'fire', 'cold', 'vampiric', 'storm']));
+      m.name = rr.name; m.maxHp *= 1.5; m.hp = m.maxHp; m.xp *= 2;
+      this.mobs.push(m);
     }
     if (this.floor.bossSpawn) {
       const b = makeMob(this.frng, this.actData.boss, this.floor.bossSpawn.x * TILE, this.floor.bossSpawn.y * TILE, lvlRange[1] + 1);
@@ -631,6 +639,10 @@ class Game {
         this.traps.splice(i, 1);
       }
     }
+    // пометка «лучше надетого» на дропах (пересчёт раз в секунду)
+    if ((this.tick % 60) === 0) {
+      for (const d of this.drops) if (d.kind === 'item') d.item._up = isUpgrade(h, d.item);
+    }
     // подбор дропа
     for (let i = this.drops.length - 1; i >= 0; i--) {
       const d = this.drops[i];
@@ -638,13 +650,15 @@ class Game {
       if (d.t < .4) continue;
       const rr = d.kind === 'item' ? 34 : 52;
       if (dist2(d.x, d.y, h.x, h.y) < rr * rr) {
-        if (d.kind === 'gold') { h.gold += d.amt; bus.emit('pickupGold'); this.fx.number(h.x, h.y - 30, '+' + d.amt + '✦', '#ffd75e'); }
+        if (d.kind === 'globe') { healHero(this, s.maxHp * .15); bus.emit('potion'); this.fx.number(h.x, h.y - 30, '+HP', '#ff6a5e'); }
+        else if (d.kind === 'gold') { h.gold += d.amt; bus.emit('pickupGold'); this.fx.number(h.x, h.y - 30, '+' + d.amt + '✦', '#ffd75e'); }
         else if (d.kind === 'potion') {
           if (h.potionCharges < s.potions) { h.potionCharges++; bus.emit('potion'); } else { healHero(this, s.maxHp * .12); }
         } else {
           if (h.inventory.length >= 24) { if (d.t > 2 && ((this.tick & 63) === 0)) this.ui.toast(STR.inventoryFull, '#c62828'); continue; }
           h.inventory.push(d.item);
           bus.emit('pickupItem', d.item.rarity, d.item.name);
+          if (isUpgrade(h, d.item)) this.ui.equipPrompt(d.item);
         }
         this.drops.splice(i, 1);
       }
@@ -674,6 +688,14 @@ class Game {
         if (!this.floor.isBossFloor) this.nextFloor();
       }
     }
+    // зона зачищена (рукотворные этажи): баннер + бонусный опыт
+    if (this.floor.zoneName && !this.floor._cleared && !this.townMode && this.floor._spawned > 0 && !this.mobs.some(m => !m.dead && m.type !== 'ally')) {
+      this.floor._cleared = true;
+      this.banner = { text: 'ЗОНА ЗАЧИЩЕНА', t: 3 };
+      gainXp(this, 30 + this.mobLvl * 18);
+      bus.emit('portal');
+    }
+    if (this.banner) { this.banner.t -= dt; if (this.banner.t <= 0) this.banner = null; }
     // разведка миникарты
     if ((this.tick & 15) === 0) {
       const f = this.floor, htx = Math.floor(h.x / TILE), hty = Math.floor(h.y / TILE);
