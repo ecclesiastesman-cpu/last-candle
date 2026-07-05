@@ -107,11 +107,19 @@ export class Flare {
         ax = Math.max(ax, m.ax); ay = Math.max(ay, m.ay);
         right = Math.max(right, m.cw - m.ax); down = Math.max(down, m.ch - m.ay);
       }
-      const cw = ax + right, ch = ay + down;
+      let cw = ax + right, ch = ay + down;
       const totalCols = Object.values(canon.anims).reduce((s, a) => Math.max(s, a.start + a.frames), 0);
+      // страховка iOS: канвас с площадью >16.7 Мп или стороной >8192 молча пустеет.
+      // Крупное оружие (двуручник) раздувает ячейку — тогда собираем лист с даунскейлом k.
+      const MAXA = 15.5e6, MAXS = 8192;
+      const w0 = cw * totalCols, h0 = ch * 5;
+      const k = Math.min(1, MAXS / w0, MAXS / h0, Math.sqrt(MAXA / (w0 * h0)));
+      if (k < 1) { cw = Math.floor(cw * k); ch = Math.floor(ch * k); ax = Math.round(ax * k); ay = Math.round(ay * k); }
       const canvas = document.createElement('canvas');
       canvas.width = cw * totalCols; canvas.height = ch * 5;
       const cx = canvas.getContext('2d');
+      cx.imageSmoothingQuality = 'high';
+      console.info(`[flare] лист героя ${canvas.width}x${canvas.height}` + (k < 1 ? ` (даунскейл ${k.toFixed(2)})` : ''));
       for (let row = 0; row < 5; row++) {
         for (const slot of Flare.ORDER[row]) {
           const n = layers[slot];
@@ -120,7 +128,8 @@ export class Flare {
           const cols = Object.values(lm.anims).reduce((s, a) => Math.max(s, a.start + a.frames), 0);
           for (let col = 0; col < Math.min(cols, totalCols); col++) {
             cx.drawImage(le.img, col * lm.cw, row * lm.ch, lm.cw, lm.ch,
-              col * cw + (ax - lm.ax), row * ch + (ay - lm.ay), lm.cw, lm.ch);
+              col * cw + (ax - Math.round(lm.ax * k)), row * ch + (ay - Math.round(lm.ay * k)),
+              Math.round(lm.cw * k), Math.round(lm.ch * k));
           }
         }
       }

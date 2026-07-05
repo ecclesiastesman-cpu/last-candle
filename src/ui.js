@@ -19,8 +19,12 @@ export class UI {
     bus.on('skillUnlocked', sk => this.skillCard(sk));
     bus.on('pickupItem', (r, name) => { if (r !== 'common') this.toast(name, RC[r]); });
   }
-  // карточка нового умения (DI-стиль): по центру сверху, с иконкой
-  skillCard(sk) {
+  // карточка нового умения (DI-стиль): по центру сверху, с иконкой.
+  // В разгар боя не заслоняем телеграфы — ждём паузы (до ~8 с, потом показываем всё равно)
+  skillCard(sk, waitedMs = 0) {
+    const g = this.g;
+    const hot = g.hero.hurtT > 0 || g.mobs?.some(m => m.aggro && !m.dead && m.type !== 'ally');
+    if (hot && waitedMs < 8000) { setTimeout(() => this.skillCard(sk, waitedMs + 2000), 2000); return; }
     this.root.querySelector('.skillcard')?.remove();
     const id = Object.keys(SKILLS).find(k => SKILLS[k] === sk);
     const el = document.createElement('div');
@@ -316,6 +320,86 @@ export class UI {
     return align === 'right' ? x : x;
   }
 
+  // круглый портрет героя (DI): голова с собранной куклы Flare, кэш по экипировке
+  portraitCache(g) {
+    const s = g.flare?.heroSheet;
+    if (!s) return null;
+    const key = g.flare.heroKey;
+    if (this._port && this._portKey === key) return this._port;
+    const D = 108; // рисуем в 2x — чётко на Retina
+    const c = document.createElement('canvas'); c.width = c.height = D;
+    const x = c.getContext('2d');
+    x.imageSmoothingQuality = 'high';
+    const bg = x.createRadialGradient(D / 2, D * .38, 6, D / 2, D / 2, D / 2);
+    bg.addColorStop(0, '#43331c'); bg.addColorStop(.7, '#1c1409'); bg.addColorStop(1, '#0a0704');
+    x.fillStyle = bg; x.beginPath(); x.arc(D / 2, D / 2, D / 2, 0, 7); x.fill();
+    x.save(); x.beginPath(); x.arc(D / 2, D / 2, D / 2 - 1, 0, 7); x.clip();
+    const m = s.meta, anim = m.anims.stance;
+    // ищем макушку по альфе в колонке вокруг оси (ax): голова всегда по центру фигуры
+    const probe = document.createElement('canvas');
+    probe.width = m.cw; probe.height = m.ch;
+    const px2 = probe.getContext('2d', { willReadFrequently: true });
+    px2.drawImage(s.canvas, anim.start * m.cw, 4 * m.ch, m.cw, m.ch, 0, 0, m.cw, m.ch);
+    let top = m.ay - 96;
+    try {
+      const id = px2.getImageData(Math.max(0, m.ax - 14), 0, 28, m.ch).data;
+      scan: for (let ry = 0; ry < m.ch; ry++)
+        for (let rx = 0; rx < 28; rx++)
+          if (id[(ry * 28 + rx) * 4 + 3] > 60) { top = ry; break scan; }
+    } catch {}
+    const headCY = top + 17; // центр головы чуть ниже макушки
+    const half = 30;
+    x.drawImage(s.canvas, anim.start * m.cw + m.ax - half, 4 * m.ch + headCY - half * .9,
+      half * 2, half * 2, 5, 7, D - 10, D - 14);
+    x.restore();
+    // лёгкая внутренняя виньетка, чтобы портрет «сидел» в раме
+    const vg = x.createRadialGradient(D / 2, D / 2, D * .30, D / 2, D / 2, D / 2);
+    vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(0,0,0,0.5)');
+    x.fillStyle = vg; x.beginPath(); x.arc(D / 2, D / 2, D / 2, 0, 7); x.fill();
+    this._port = c; this._portKey = key;
+    return c;
+  }
+  // портрет + золотая рама + ромб-бейдж уровня (сверху-слева, как в DI)
+  drawPortrait(ctx, g, pcx, pcy, pr, timeS) {
+    const port = this.portraitCache(g);
+    ctx.save();
+    if (port) ctx.drawImage(port, pcx - pr, pcy - pr, pr * 2, pr * 2);
+    else {
+      ctx.fillStyle = '#140f08';
+      ctx.beginPath(); ctx.arc(pcx, pcy, pr, 0, 7); ctx.fill();
+    }
+    // кованая золотая рама
+    const ring = ctx.createLinearGradient(pcx, pcy - pr, pcx, pcy + pr);
+    ring.addColorStop(0, '#c9a153'); ring.addColorStop(.5, '#6a5016'); ring.addColorStop(1, '#33240a');
+    ctx.strokeStyle = ring; ctx.lineWidth = 3.2;
+    ctx.beginPath(); ctx.arc(pcx, pcy, pr + .5, 0, 7); ctx.stroke();
+    ctx.strokeStyle = 'rgba(0,0,0,0.75)'; ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.arc(pcx, pcy, pr - 1.6, 0, 7); ctx.stroke();
+    ctx.strokeStyle = 'rgba(255,228,160,0.28)'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(pcx, pcy, pr + 2.6, 0, 7); ctx.stroke();
+    // четыре декоративные заклёпки по диагоналям рамы
+    for (let i = 0; i < 4; i++) {
+      const a = Math.PI / 4 + i * Math.PI / 2;
+      const bx = pcx + Math.cos(a) * (pr + .5), by = pcy + Math.sin(a) * (pr + .5);
+      ctx.fillStyle = '#8a7448'; ctx.beginPath(); ctx.arc(bx, by, 2, 0, 7); ctx.fill();
+      ctx.fillStyle = 'rgba(255,235,190,0.55)'; ctx.beginPath(); ctx.arc(bx - .6, by - .6, .7, 0, 7); ctx.fill();
+    }
+    // ромб уровня внизу рамы
+    const lx = pcx, ly = pcy + pr + 2;
+    ctx.translate(lx, ly); ctx.rotate(Math.PI / 4);
+    const bs = 9;
+    const bgr = ctx.createLinearGradient(-bs, -bs, bs, bs);
+    bgr.addColorStop(0, '#241a08'); bgr.addColorStop(1, '#0c0803');
+    ctx.fillStyle = bgr; ctx.fillRect(-bs, -bs, bs * 2, bs * 2);
+    ctx.strokeStyle = '#b8934a'; ctx.lineWidth = 1.6; ctx.strokeRect(-bs, -bs, bs * 2, bs * 2);
+    ctx.rotate(-Math.PI / 4);
+    ctx.fillStyle = '#ffe9b0'; ctx.font = 'bold 11px Forum, Georgia, serif'; ctx.textAlign = 'center';
+    ctx.strokeStyle = 'rgba(0,0,0,0.8)'; ctx.lineWidth = 2.6;
+    ctx.strokeText(g.hero.level, 0, 4);
+    ctx.fillText(g.hero.level, 0, 4);
+    ctx.restore();
+  }
+
   // ---------- HUD ----------
   drawHud(ctx, g, input) {
     const W = innerWidth, H = innerHeight;
@@ -351,8 +435,8 @@ export class UI {
       '#e0402e', '#5e0a0a', Math.ceil(h.hp), timeS, h.hp < s.maxHp * .3);
     this.drawOrb(ctx, mpPos[0], mpPos[1], orbR, clamp(h.res / s.maxRes, 0, 1),
       resCol[0], resCol[1], Math.ceil(h.res), timeS, false);
-    // XP: золочёный жёлоб с насечками
-    const xw = W * (land ? .26 : .44), xx = W / 2 - xw / 2, xy = H - 9;
+    // XP: золочёный жёлоб с насечками (шире, как нижняя кромка DI)
+    const xw = W * (land ? .40 : .44), xx = W / 2 - xw / 2, xy = H - 12; // зазор под home-индикатор iPhone
     ctx.fillStyle = 'rgba(0,0,0,0.72)';
     ctx.beginPath(); ctx.roundRect(xx - 2, xy - 2, xw + 4, 9, 4); ctx.fill();
     ctx.strokeStyle = 'rgba(140,109,31,0.5)'; ctx.lineWidth = 1; ctx.stroke();
@@ -362,23 +446,19 @@ export class UI {
     ctx.fillStyle = xg; ctx.fillRect(xx, xy, xw * xf, 5);
     ctx.fillStyle = 'rgba(0,0,0,0.5)';
     for (let i = 1; i < 10; i++) ctx.fillRect(xx + xw * i / 10, xy, 1, 5);
-    // верхние плашки: акт и золото
-    const actName = g.townMode ? STR.town : g.progress.rift ? `${STR.rift} ${g.progress.riftLvl}` : g.floor?.zoneName ? g.floor.zoneName : `${STR.acts[g.progress.act].name} · ${STR.floor} ${g.progress.floor}`;
+    // портрет героя с уровнем (DI: сверху-слева), рядом плашка золота
+    const pcx = (land ? SL : 6) + 32, pcy = 36, pr = 26;
+    this.drawPortrait(ctx, g, pcx, pcy, pr, timeS);
     ctx.font = '13px Georgia, serif';
-    const anw = ctx.measureText(actName).width + 18;
-    this.drawPlaque(ctx, 8, 8, anw, 24);
-    ctx.fillStyle = '#cfc4a2'; ctx.textAlign = 'left';
-    ctx.fillText(actName, 17, 25);
-    this.drawPlaque(ctx, 8, 36, 86, 22);
-    ctx.fillStyle = '#9a917c'; ctx.fillText(`${STR.level} ${h.level}`, 17, 52);
     const goldTxt = `${h.gold}`;
     const gw = ctx.measureText(goldTxt).width + 34;
-    this.drawPlaque(ctx, W - 8, 8, gw, 24, 'right');
-    ctx.fillStyle = '#ffd75e'; ctx.textAlign = 'right';
-    ctx.fillText(goldTxt, W - 17, 25);
+    const gx = pcx + pr + 10;
+    this.drawPlaque(ctx, gx, 10, gw, 24);
+    ctx.fillStyle = '#ffd75e'; ctx.textAlign = 'left';
+    ctx.fillText(goldTxt, gx + 26, 27);
     // монетка
-    ctx.beginPath(); ctx.arc(W - gw + 6, 20, 5.5, 0, 7);
-    const coin = ctx.createRadialGradient(W - gw + 4, 18, 1, W - gw + 6, 20, 6);
+    ctx.beginPath(); ctx.arc(gx + 14, 22, 5.5, 0, 7);
+    const coin = ctx.createRadialGradient(gx + 12, 20, 1, gx + 14, 22, 6);
     coin.addColorStop(0, '#ffe9a0'); coin.addColorStop(1, '#8a6a1a');
     ctx.fillStyle = coin; ctx.fill();
     // ---- стики (тач) ----
@@ -526,12 +606,13 @@ export class UI {
       let txt = qd.text;
       if (qd.kills) txt += ` (${Math.min(q.k, qd.kills)}/${qd.kills})`;
       ctx.font = '12px Georgia, serif';
+      const qx = (land ? SL : 6) + 4;
       const qw = Math.min(ctx.measureText(txt).width + 26, W * .5);
-      this.drawPlaque(ctx, 8, 62, qw, 22);
+      this.drawPlaque(ctx, qx, 80, qw, 22);
       ctx.fillStyle = '#e8c85a'; ctx.textAlign = 'left';
-      ctx.fillText('✦', 15, 78);
+      ctx.fillText('✦', qx + 7, 96);
       ctx.fillStyle = '#cfc4a2';
-      ctx.fillText(txt, 27, 78);
+      ctx.fillText(txt, qx + 19, 96);
       // стрелка-указатель к цели
       const tgt = g.questTarget?.();
       if (tgt && !g.hero.dead) {
@@ -637,6 +718,14 @@ export class UI {
     }
     ctx.fillStyle = '#ffd75e'; ctx.font = 'bold 9px Georgia'; ctx.textAlign = 'center';
     ctx.fillText('С', cx, cy - R + 10);
+    // имя зоны под линзой (DI-стиль)
+    const zone = g.townMode ? STR.town : g.progress.rift ? `${STR.rift} ${g.progress.riftLvl}`
+      : g.floor?.zoneName ? g.floor.zoneName : `${STR.acts[g.progress.act].name} · ${STR.floor} ${g.progress.floor}`;
+    ctx.font = '11px Forum, Georgia, serif';
+    ctx.fillStyle = '#cfc4a2';
+    ctx.strokeStyle = 'rgba(0,0,0,0.85)'; ctx.lineWidth = 3; ctx.lineJoin = 'round';
+    ctx.strokeText(zone, cx, cy + R + 14);
+    ctx.fillText(zone, cx, cy + R + 14);
     ctx.restore();
     ctx.globalAlpha = 1;
   }

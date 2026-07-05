@@ -516,8 +516,20 @@ class Game {
     requestAnimationFrame(t => this.frame(t));
     const STEP = 1000 / 60;
     if (this.blurPause) { this.last = now; return; }
-    this.acc = Math.min((this.acc || 0) + (now - this.last), 100);
+    const rawMs = now - this.last;
+    this.acc = Math.min((this.acc || 0) + rawMs, 100);
     this.last = now;
+    // автооткат DPR: кадр стабильно дольше 19 мс ~2 c подряд → снижаем бэкбуфер (2.25 → 1.5 → 1.15)
+    if (this.state === 'dungeon' && !this.paused && rawMs > 0 && rawMs < 500) {
+      this._ftAvg = (this._ftAvg ?? 16) * .95 + rawMs * .05;
+      if (this._ftAvg > 19 && this.renderer.dpr > 1.16) {
+        this._slowMs = (this._slowMs || 0) + rawMs;
+        if (this._slowMs > 2000) {
+          this.renderer.resize(this.renderer.dpr > 1.51 ? 1.5 : 1.15);
+          this._slowMs = 0; this._ftAvg = 16;
+        }
+      } else this._slowMs = 0;
+    }
     const cmds = this.input.poll();
     while (this.acc >= STEP) {
       if (!this.paused) this.update(STEP / 1000, cmds);
@@ -947,7 +959,7 @@ class Game {
 }
 
 const game = new Game();
-if (game.dev) window.__game = game; // отладочный доступ (?dev=1)
+window.__game = game; // доступ для тестов; дев-оверлей включается отдельно (?dev=1)
 (async () => {
   await game.loadAssets();
   game.start();

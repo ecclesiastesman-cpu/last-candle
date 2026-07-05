@@ -42,11 +42,16 @@ export class Renderer {
     this.wallCache.set(key, c);
     return c;
   }
-  resize(dprCap = 1.5) {
-    const dpr = Math.min(devicePixelRatio || 1, dprCap);
+  resize(dprCap = 2.25) {
+    // Retina-качество: iPhone (dpr 3) рисуем в 2.25x — модель героя без мыла.
+    // Ограничение по площади бэкбуфера страхует большие планшеты от просадок.
+    let dpr = Math.min(devicePixelRatio || 1, dprCap);
+    const maxPix = 3.4e6;
+    if (innerWidth * innerHeight * dpr * dpr > maxPix) dpr = Math.max(1, Math.sqrt(maxPix / (innerWidth * innerHeight)));
     this.dpr = dpr;
     this.canvas.width = innerWidth * dpr; this.canvas.height = innerHeight * dpr;
     this.canvas.style.width = innerWidth + 'px'; this.canvas.style.height = innerHeight + 'px';
+    this.ctx.imageSmoothingQuality = 'high';
     this.lightCanvas.width = Math.ceil(innerWidth / 4); this.lightCanvas.height = Math.ceil(innerHeight / 4);
     this.zoom = clamp(Math.min(innerWidth, innerHeight) / 760, .5, .95);
   }
@@ -243,10 +248,10 @@ export class Renderer {
       if (img) {
         const pul = 1 + Math.sin(timeS * 2.5) * .07;
         ctx.save(); ctx.translate(px, py);
-        if (n.kind === 'ret') ctx.filter = 'hue-rotate(160deg)';
         ctx.scale(1.5, 1.15);
-        ctx.drawImage(img, -55 * pul, -80 * pul, 110 * pul, 110 * pul);
-        ctx.restore(); ctx.filter = 'none';
+        const pim = n.kind === 'ret' ? this.tinted(img, '#3d8bff', .6) : img;
+        ctx.drawImage(pim, -55 * pul, -80 * pul, 110 * pul, 110 * pul);
+        ctx.restore();
       }
     } else if (n.kind === 'altar') {
       const id = this.tilesMeta?.groups?.altars?.[0] ?? this.tilesMeta?.groups?.pillar?.[0];
@@ -394,12 +399,15 @@ export class Renderer {
     const h = g.hero;
     if (!h.form && g.flare?.heroSheet) {
       const s = g.flare.heroSheet;
-      const fscale = 100 / s.meta.ay;
+      const fscale = 108 / s.meta.ay; // герой чуть крупнее — как в DI
       ctx.save();
       const [hpx, hpy] = proj(h.x, h.y);
       ctx.translate(hpx, hpy);
-      ctx.fillStyle = 'rgba(0,0,0,0.45)';
-      ctx.beginPath(); ctx.ellipse(0, 5, 22, 9, 0, 0, 7); ctx.fill();
+      // мягкая контактная тень (двойной эллипс вместо плоского пятна)
+      ctx.fillStyle = 'rgba(0,0,0,0.28)';
+      ctx.beginPath(); ctx.ellipse(0, 5, 26, 11, 0, 0, 7); ctx.fill();
+      ctx.fillStyle = 'rgba(0,0,0,0.4)';
+      ctx.beginPath(); ctx.ellipse(0, 5, 17, 7, 0, 0, 7); ctx.fill();
       if (h.hurtT > 0) ctx.globalAlpha = .6 + Math.sin(timeS * 60) * .3;
       const anim = h.dead ? 'die' : h.action ? h.action.name : h.moving ? 'run' : 'stance';
       const t = h.dead ? h.deadT * 1000 : h.action ? h.action.t : h.animT * 1000;
@@ -480,7 +488,6 @@ export class Renderer {
       ctx.globalAlpha = 1;
     }
     if (m.hitT > 0) ctx.globalAlpha = .82; // вспышку даёт fx.impact — canvas-filter на iOS дорог
-    if (m.freezeT > 0) { ctx.filter = 'saturate(0.3) brightness(1.3)'; }
     let drawn = false;
     if (m.flare && g.flare) {
       const fm = g.flare.meta?.[m.flare];
@@ -502,6 +509,14 @@ export class Renderer {
       const src = (img && m.tint) ? this.tinted(img, m.tint, .4) : img;
       if (src) ctx.drawImage(src, -size / 2, -size * .58 + bob, size, size);
       else { ctx.fillStyle = m.tint || '#813'; ctx.fillRect(-m.r, -m.r, m.r * 2, m.r * 2); }
+    }
+    if (m.freezeT > 0) { // ледяная аура вместо canvas-filter (дорог на iOS при пачке замороженных)
+      const fh = m.r * 3.4;
+      ctx.globalAlpha = .38;
+      ctx.drawImage(this.glowSprite('#a8d8ff'), -fh, -fh * 1.35, fh * 2, fh * 2);
+      ctx.globalAlpha = .85; ctx.strokeStyle = '#cfe9ff'; ctx.lineWidth = 1.6;
+      ctx.beginPath(); ctx.arc(0, 4, m.r * 1.35, 0, 7); ctx.stroke();
+      ctx.globalAlpha = 1;
     }
     ctx.restore();
     ctx.filter = 'none'; ctx.globalAlpha = 1;
@@ -763,7 +778,7 @@ export class Renderer {
   // Свет: тьма с вырезанными радиальными градиентами (низкое разрешение, растянуто)
   drawLight(g, timeS) {
     const lc = this.lightCanvas, lx = lc.getContext('2d');
-    const z = this.zoom / 4 * this.dpr / this.dpr;
+    const z = this.zoom / 4;
     lx.globalCompositeOperation = 'source-over';
     lx.fillStyle = 'rgba(0,0,0,0.9)';
     lx.fillRect(0, 0, lc.width, lc.height);

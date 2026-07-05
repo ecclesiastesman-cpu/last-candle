@@ -1,5 +1,5 @@
 // Service Worker: полный прекэш — игра работает без сети после первого открытия.
-const VERSION = 'lastcandle-v15';
+const VERSION = 'lastcandle-v16';
 const CORE = [
   './', './index.html', './manifest.webmanifest',
   './src/main.js', './src/core.js', './src/data.js', './src/strings.js', './src/items.js',
@@ -20,7 +20,7 @@ const SKILLICONS = ['cleave', 'whirlwind', 'leap', 'execute', 'warcry', 'terrify
   'wolfform', 'rend', 'frenzy', 'bearform', 'maul', 'roar', 'roots', 'swarm', 'heal', 'attack', 'potion'
 ].map(n => './assets/skills/' + n + '.webp');
 const FLARE = ['e_skeleton', 'e_skeleton_mage', 'e_zombie', 'e_goblin', 'e_antlion', 'e_minotaur', 'e_wyvern',
-  'n_trader', 'n_guild',
+  'n_trader', 'n_guild', 'n_peasant',
   'm_default_feet', 'm_default_legs', 'm_default_hands', 'm_default_chest', 'm_head_short',
   'm_cloth_shirt', 'm_leather_chest', 'm_chain_cuirass', 'm_plate_cuirass', 'm_mage_vest',
   'm_leather_hood', 'm_chain_coif', 'm_plate_helm', 'm_buckler', 'm_kite_shield',
