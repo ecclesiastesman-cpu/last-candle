@@ -56,7 +56,7 @@ export function genFloor(seed, act, floorNum, isBossFloor) {
       for (const cx of px) for (const cy of py) if (rng.chance(.8)) g[cy * W + cx] = T_WALL;
     }
     // стоячие пропсы вдоль стен комнаты (гробницы, статуи, утварь акта)
-    const nProps = Math.max(1, Math.round(area / 16));
+    const nProps = Math.max(2, Math.round(area / 11));
     for (let k = 0, placed = 0; k < nProps * 6 && placed < nProps; k++) {
       const side = rng.int(0, 3);
       const tx = side === 0 ? r.x : side === 1 ? r.x + r.w - 1 : rng.int(r.x, r.x + r.w - 1);
@@ -66,7 +66,7 @@ export function genFloor(seed, act, floorNum, isBossFloor) {
       placed++;
     }
     // настил: кости, круги — где угодно в комнате
-    const nFloor = Math.round(area / 26);
+    const nFloor = Math.round(area / 16);
     for (let k = 0; k < nFloor; k++) {
       const tx = rng.int(r.x, r.x + r.w - 1), ty = rng.int(r.y, r.y + r.h - 1);
       if (g[ty * W + tx] !== T_FLOOR || propAt.has(ty * W + tx)) continue;
@@ -90,8 +90,19 @@ export function genFloor(seed, act, floorNum, isBossFloor) {
   }
   let bossSpawn = null;
   if (isBossFloor) bossSpawn = { x: exit.cx, y: exit.cy };
+  // настенные факелы-скобы: на стенах с полом к югу (лицом к камере), редкой гребёнкой
+  const sconces = [];
+  for (let ty = 1; ty < H - 1; ty++) {
+    for (let tx = 1; tx < W - 1; tx++) {
+      if (g[ty * W + tx] !== T_WALL) continue;
+      if (g[(ty + 1) * W + tx] !== T_FLOOR) continue;
+      if (((tx * 7 + ty * 13) % 7) !== 0) continue;
+      sconces.push({ tx, ty });
+    }
+  }
+  if (sconces.length > 30) sconces.length = 30;
   const visited = new Uint8Array(W * H);
-  return { W, H, g, rooms, entry, exit, decor, torches, spawns, chests, decals, visited, bossSpawn, act, floorNum, isBossFloor, propAt, propsFloor };
+  return { W, H, g, rooms, entry, exit, decor, torches, spawns, chests, decals, visited, bossSpawn, act, floorNum, isBossFloor, propAt, propsFloor, sconces };
 }
 
 export const isWall = (f, tx, ty) => tx < 0 || ty < 0 || tx >= f.W || ty >= f.H || f.g[ty * f.W + tx] === T_WALL

@@ -279,6 +279,34 @@ export class Renderer {
     }
   }
 
+  // настенный факел-скоба на южной грани стены
+  drawSconce(tx, ty, timeS) {
+    const { ctx } = this;
+    const [px, py] = proj(tx * TILE + TILE / 2, ty * TILE + TILE);
+    ctx.save();
+    ctx.translate(px, py - 66);
+    // железная скоба
+    ctx.strokeStyle = '#241d14'; ctx.lineWidth = 3.4; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(0, 14); ctx.quadraticCurveTo(4, 6, 0, 0); ctx.stroke();
+    ctx.strokeStyle = '#3d3226'; ctx.lineWidth = 1.4;
+    ctx.beginPath(); ctx.moveTo(-.8, 13); ctx.quadraticCurveTo(3, 6, -.6, 1); ctx.stroke();
+    // чаша
+    ctx.fillStyle = '#33281a'; ctx.beginPath(); ctx.ellipse(0, 0, 5.5, 2.6, 0, 0, 7); ctx.fill();
+    // пламя
+    const fl = Math.sin(timeS * 14 + tx * 3 + ty) * .2 + Math.sin(timeS * 31 + ty * 2) * .1;
+    ctx.globalAlpha = .9;
+    ctx.fillStyle = '#ff9840';
+    ctx.beginPath();
+    ctx.moveTo(-4.5, -1); ctx.quadraticCurveTo(-5, -13 - fl * 6, 0, -19 - fl * 8);
+    ctx.quadraticCurveTo(5, -12 - fl * 5, 4.5, -1); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#ffd75e';
+    ctx.beginPath();
+    ctx.moveTo(-2.2, -1); ctx.quadraticCurveTo(-2.6, -8 - fl * 4, 0, -12 - fl * 5);
+    ctx.quadraticCurveTo(2.6, -8 - fl * 3, 2.2, -1); ctx.closePath(); ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.restore();
+  }
+
   // стоячая жаровня с живым пламенем
   drawBrazier(wx, wy, timeS) {
     const { ctx } = this;
@@ -566,6 +594,13 @@ export class Renderer {
       const wx = g.floor.campfire.tx * TILE + TILE / 2, wy = g.floor.campfire.ty * TILE + TILE / 2;
       put(wx, wy, 300 * flick, .95);
       fires.push([wx, wy, 210]);
+    }
+    if (g.floor.sconces) for (const sc of g.floor.sconces) {
+      const wx = sc.tx * TILE + TILE / 2, wy = (sc.ty + 1) * TILE;
+      const [spx, spy] = proj(wx, wy);
+      if (Math.abs(spx - this.cam.px) > innerWidth * 1.2 || Math.abs(spy - this.cam.py) > innerHeight * 1.2) continue;
+      put(wx, wy, 150 * flick, .7);
+      fires.push([wx, wy, 90]);
     }
     for (const p of g.projectiles) if (p.color && !p.arrow) put(p.x, p.y, 60, .7);
     for (const z2 of g.zones) put(z2.x, z2.y, z2.r * 1.2, .5);

@@ -673,6 +673,10 @@ class Game {
       if (t.x < vx0 || t.x > vx1 || t.y < vy0 || t.y > vy1) continue;
       list.push({ kind: 'brazier', x: wx, y: wy, key: wx + wy });
     }
+    if (f.sconces) for (const sc of f.sconces) {
+      if (sc.tx < vx0 || sc.tx > vx1 || sc.ty < vy0 || sc.ty > vy1) continue;
+      list.push({ kind: 'sconce', sc, key: (sc.tx + sc.ty + 1.65) * TILE });
+    }
     for (const d of f.decor) {
       const wx = d.x * TILE + TILE / 2, wy = d.y * TILE + TILE / 2;
       if (d.x < vx0 || d.x > vx1 || d.y < vy0 || d.y > vy1) continue;
@@ -696,6 +700,7 @@ class Game {
     for (const e of list) {
       if (e.kind === 'wall') r.drawWallCell(this, e.tx, e.ty);
       else if (e.kind === 'brazier') r.drawBrazier(e.x, e.y, timeS);
+      else if (e.kind === 'sconce') r.drawSconce(e.sc.tx, e.sc.ty, timeS);
       else if (e.kind === 'decor') {
         const img = this.assets[this.actData.decor[e.d.kind] || 'dec_bones'];
         if (img) {

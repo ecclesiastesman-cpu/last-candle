@@ -37,23 +37,63 @@ export class UI {
     }
     return this._hud[k];
   }
-  // каменная рама орба с заклёпками
+  // резная каменная рама орба с металлическими когтями (в духе D2)
   orbFrame(r) {
-    return this.hudCache('orbframe', r * 2 + 16, r * 2 + 16, (x, w, h) => {
+    const pad = 18;
+    return this.hudCache('orbframe2', r * 2 + pad * 2, r * 2 + pad * 2, (x, w, h) => {
       const c = w / 2;
-      const ring = x.createRadialGradient(c - r * .3, c - r * .3, r * .5, c, c, r + 8);
-      ring.addColorStop(0, '#6b5a3a'); ring.addColorStop(.7, '#3a2f1c'); ring.addColorStop(1, '#171208');
-      x.strokeStyle = ring; x.lineWidth = 7;
-      x.beginPath(); x.arc(c, c, r + 3.5, 0, 7); x.stroke();
-      x.strokeStyle = 'rgba(255,225,170,0.25)'; x.lineWidth = 1.5;
-      x.beginPath(); x.arc(c, c, r + 7, 0, 7); x.stroke();
-      x.strokeStyle = 'rgba(0,0,0,0.6)'; x.beginPath(); x.arc(c, c, r, 0, 7); x.stroke();
-      // заклёпки
+      // тень под рамой
+      x.fillStyle = 'rgba(0,0,0,0.45)';
+      x.beginPath(); x.ellipse(c, c + r * .28, r + 10, r + 4, 0, 0, 7); x.fill();
+      // широкое каменное кольцо
+      const ring = x.createRadialGradient(c - r * .35, c - r * .4, r * .4, c, c, r + 12);
+      ring.addColorStop(0, '#7a684a'); ring.addColorStop(.55, '#4a3c24'); ring.addColorStop(.85, '#241b0e'); ring.addColorStop(1, '#0e0a05');
+      x.strokeStyle = ring; x.lineWidth = 11;
+      x.beginPath(); x.arc(c, c, r + 5.5, 0, 7); x.stroke();
+      // резные сегменты кольца (радиальные насечки камня)
+      for (let i = 0; i < 20; i++) {
+        const a = i / 20 * Math.PI * 2;
+        x.strokeStyle = i % 2 ? 'rgba(0,0,0,0.4)' : 'rgba(255,225,170,0.10)';
+        x.lineWidth = i % 2 ? 1.6 : 1;
+        x.beginPath();
+        x.moveTo(c + Math.cos(a) * (r + 1), c + Math.sin(a) * (r + 1));
+        x.lineTo(c + Math.cos(a) * (r + 10), c + Math.sin(a) * (r + 10));
+        x.stroke();
+      }
+      // внешняя золочёная кромка + внутренний тёмный шов
+      x.strokeStyle = 'rgba(200,160,90,0.5)'; x.lineWidth = 1.6;
+      x.beginPath(); x.arc(c, c, r + 11, 0, 7); x.stroke();
+      x.strokeStyle = 'rgba(255,232,180,0.16)'; x.lineWidth = 1;
+      x.beginPath(); x.arc(c, c, r + 12.5, 0, 7); x.stroke();
+      x.strokeStyle = 'rgba(0,0,0,0.75)'; x.lineWidth = 2;
+      x.beginPath(); x.arc(c, c, r, 0, 7); x.stroke();
+      x.strokeStyle = 'rgba(214,178,104,0.55)'; x.lineWidth = 1.4;
+      x.beginPath(); x.arc(c, c, r + .8, 0, 7); x.stroke();
+      // четыре кованых когтя, обхватывающих стекло
       for (let i = 0; i < 4; i++) {
         const a = Math.PI / 4 + i * Math.PI / 2;
-        const bx = c + Math.cos(a) * (r + 3.5), by = c + Math.sin(a) * (r + 3.5);
-        x.fillStyle = '#8a7448'; x.beginPath(); x.arc(bx, by, 2.6, 0, 7); x.fill();
-        x.fillStyle = 'rgba(0,0,0,0.5)'; x.beginPath(); x.arc(bx + .8, by + .8, 1.2, 0, 7); x.fill();
+        x.save();
+        x.translate(c + Math.cos(a) * (r + 4), c + Math.sin(a) * (r + 4));
+        x.rotate(a + Math.PI / 2);
+        const mg = x.createLinearGradient(-5, 0, 5, 0);
+        mg.addColorStop(0, '#2a2118'); mg.addColorStop(.45, '#9c8557'); mg.addColorStop(.6, '#d8ba7a'); mg.addColorStop(1, '#3a2d18');
+        x.fillStyle = mg;
+        x.beginPath();
+        x.moveTo(-6, -3); x.quadraticCurveTo(-7, 6, 0, 13.5);
+        x.quadraticCurveTo(7, 6, 6, -3);
+        x.quadraticCurveTo(0, -7, -6, -3); x.closePath(); x.fill();
+        x.strokeStyle = 'rgba(0,0,0,0.6)'; x.lineWidth = 1.2; x.stroke();
+        // заклёпка на когте
+        x.fillStyle = '#e0c88a'; x.beginPath(); x.arc(0, 0, 1.8, 0, 7); x.fill();
+        x.fillStyle = 'rgba(0,0,0,0.5)'; x.beginPath(); x.arc(.6, .6, .9, 0, 7); x.fill();
+        x.restore();
+      }
+      // малые заклёпки между когтями
+      for (let i = 0; i < 4; i++) {
+        const a = i * Math.PI / 2;
+        const bx = c + Math.cos(a) * (r + 5.5), by = c + Math.sin(a) * (r + 5.5);
+        x.fillStyle = '#8a7448'; x.beginPath(); x.arc(bx, by, 2.2, 0, 7); x.fill();
+        x.fillStyle = 'rgba(255,235,190,0.5)'; x.beginPath(); x.arc(bx - .7, by - .7, .8, 0, 7); x.fill();
       }
     });
   }
@@ -112,66 +152,134 @@ export class UI {
     ctx.strokeText(label, cx, cy + r * .13);
     ctx.fillText(label, cx, cy + r * .13);
   }
-  // гравированная база стика
+  // кованая база стика: железное кольцо с рунами и фаской
   stickBase(r, gold) {
-    return this.hudCache('stick' + (gold ? 'G' : 'S'), r * 2 + 14, r * 2 + 14, (x, w) => {
+    return this.hudCache('stick2' + (gold ? 'G' : 'S'), r * 2 + 18, r * 2 + 18, (x, w) => {
       const c = w / 2;
-      const face = x.createRadialGradient(c - r * .3, c - r * .35, r * .2, c, c, r);
-      if (gold) { face.addColorStop(0, 'rgba(90,72,34,0.5)'); face.addColorStop(1, 'rgba(28,21,8,0.55)'); }
-      else { face.addColorStop(0, 'rgba(70,70,76,0.4)'); face.addColorStop(1, 'rgba(18,18,22,0.5)'); }
+      // утопленная площадка
+      const face = x.createRadialGradient(c - r * .3, c - r * .35, r * .15, c, c, r);
+      if (gold) { face.addColorStop(0, 'rgba(84,66,30,0.42)'); face.addColorStop(.8, 'rgba(30,22,9,0.5)'); face.addColorStop(1, 'rgba(12,9,4,0.6)'); }
+      else { face.addColorStop(0, 'rgba(64,64,72,0.35)'); face.addColorStop(.8, 'rgba(20,20,25,0.48)'); face.addColorStop(1, 'rgba(8,8,10,0.6)'); }
       x.fillStyle = face; x.beginPath(); x.arc(c, c, r, 0, 7); x.fill();
-      // резной обод
-      x.strokeStyle = gold ? '#a4813a' : '#5d5d66'; x.lineWidth = 3;
-      x.beginPath(); x.arc(c, c, r, 0, 7); x.stroke();
-      x.strokeStyle = 'rgba(0,0,0,0.55)'; x.lineWidth = 1.5;
-      x.beginPath(); x.arc(c, c, r - 4, 0, 7); x.stroke();
-      x.strokeStyle = gold ? 'rgba(255,215,120,0.3)' : 'rgba(230,230,255,0.14)';
-      x.beginPath(); x.arc(c, c, r + 2.5, 0, 7); x.stroke();
-      // засечки
-      x.strokeStyle = gold ? 'rgba(216,178,90,0.8)' : 'rgba(140,140,150,0.5)'; x.lineWidth = 2;
-      for (let a = 0; a < 8; a++) {
-        const an = a * Math.PI / 4 + (gold ? 0 : Math.PI / 8);
+      // широкий кованый обод с фаской
+      const rim = x.createLinearGradient(c, c - r, c, c + r);
+      if (gold) { rim.addColorStop(0, '#8a6c2e'); rim.addColorStop(.5, '#4a3814'); rim.addColorStop(1, '#1c1406'); }
+      else { rim.addColorStop(0, '#6a6a76'); rim.addColorStop(.5, '#3a3a44'); rim.addColorStop(1, '#141418'); }
+      x.strokeStyle = rim; x.lineWidth = 6.5;
+      x.beginPath(); x.arc(c, c, r + 1, 0, 7); x.stroke();
+      x.strokeStyle = gold ? 'rgba(255,220,140,0.35)' : 'rgba(220,225,255,0.18)'; x.lineWidth = 1.3;
+      x.beginPath(); x.arc(c, c, r + 4.5, 0, 7); x.stroke();
+      x.strokeStyle = 'rgba(0,0,0,0.7)'; x.lineWidth = 1.4;
+      x.beginPath(); x.arc(c, c, r - 2.6, 0, 7); x.stroke();
+      // руны по ободу (детерминированные штрихи)
+      x.strokeStyle = gold ? 'rgba(230,192,110,0.85)' : 'rgba(160,164,178,0.6)';
+      x.lineWidth = 1.6; x.lineCap = 'round';
+      for (let i = 0; i < 12; i++) {
+        const an = i * Math.PI / 6;
+        x.save();
+        x.translate(c + Math.cos(an) * (r + 1), c + Math.sin(an) * (r + 1));
+        x.rotate(an + Math.PI / 2);
         x.beginPath();
-        x.moveTo(c + Math.cos(an) * (r - 10), c + Math.sin(an) * (r - 10));
-        x.lineTo(c + Math.cos(an) * (r - 3), c + Math.sin(an) * (r - 3));
+        const v = (i * 7) % 4; // «руна» из 2-3 штрихов
+        if (v === 0) { x.moveTo(-1.6, -2.4); x.lineTo(-1.6, 2.4); x.moveTo(-1.6, 0); x.lineTo(1.8, -2.2); }
+        else if (v === 1) { x.moveTo(0, -2.4); x.lineTo(0, 2.4); x.moveTo(-1.8, -1); x.lineTo(1.8, 1); }
+        else if (v === 2) { x.moveTo(-1.6, 2.2); x.lineTo(0, -2.4); x.lineTo(1.6, 2.2); }
+        else { x.moveTo(-1.6, -2.2); x.lineTo(1.6, -2.2); x.moveTo(0, -2.2); x.lineTo(0, 2.4); }
+        x.stroke();
+        x.restore();
+      }
+      // крестовые метки направлений на площадке
+      x.strokeStyle = gold ? 'rgba(216,178,90,0.4)' : 'rgba(150,150,165,0.3)'; x.lineWidth = 1.8;
+      for (let i = 0; i < 4; i++) {
+        const an = i * Math.PI / 2;
+        x.beginPath();
+        x.moveTo(c + Math.cos(an) * (r - 13), c + Math.sin(an) * (r - 13));
+        x.lineTo(c + Math.cos(an) * (r - 6), c + Math.sin(an) * (r - 6));
         x.stroke();
       }
+      // лёгкое внутреннее свечение по низу (отражение)
+      x.strokeStyle = gold ? 'rgba(255,220,140,0.12)' : 'rgba(220,230,255,0.07)'; x.lineWidth = 2.4;
+      x.beginPath(); x.arc(c, c, r - 4.5, Math.PI * .15, Math.PI * .85); x.stroke();
     });
   }
-  // рукоятка стика (каменный шар)
+  // рукоятка стика: кованый набалдашник с ободом и насечкой
   drawKnob(ctx, x, y, r, gold, alpha) {
     ctx.save();
     ctx.globalAlpha = alpha;
-    const k = ctx.createRadialGradient(x - r * .3, y - r * .35, r * .1, x, y, r);
-    if (gold) { k.addColorStop(0, '#e8c268'); k.addColorStop(.55, '#8a6a26'); k.addColorStop(1, '#3a2a0c'); }
-    else { k.addColorStop(0, '#b7b7c2'); k.addColorStop(.55, '#5e5e68'); k.addColorStop(1, '#232328'); }
+    // тень
+    ctx.fillStyle = 'rgba(0,0,0,0.4)';
+    ctx.beginPath(); ctx.ellipse(x + 1.5, y + r * .55, r * .85, r * .4, 0, 0, 7); ctx.fill();
+    const k = ctx.createRadialGradient(x - r * .32, y - r * .38, r * .08, x, y, r);
+    if (gold) { k.addColorStop(0, '#f2d489'); k.addColorStop(.4, '#b08e3e'); k.addColorStop(.75, '#6a4e18'); k.addColorStop(1, '#2a1d08'); }
+    else { k.addColorStop(0, '#c8c8d4'); k.addColorStop(.4, '#82828e'); k.addColorStop(.75, '#46464f'); k.addColorStop(1, '#1a1a1f'); }
     ctx.fillStyle = k; ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill();
-    ctx.strokeStyle = 'rgba(0,0,0,0.55)'; ctx.lineWidth = 1.5; ctx.stroke();
-    ctx.fillStyle = 'rgba(255,255,255,0.35)';
-    ctx.beginPath(); ctx.ellipse(x - r * .3, y - r * .42, r * .28, r * .16, -.6, 0, 7); ctx.fill();
+    ctx.strokeStyle = 'rgba(0,0,0,0.6)'; ctx.lineWidth = 1.5; ctx.stroke();
+    // врезанное кольцо
+    ctx.strokeStyle = 'rgba(0,0,0,0.4)'; ctx.lineWidth = 1.4;
+    ctx.beginPath(); ctx.arc(x, y, r * .62, 0, 7); ctx.stroke();
+    ctx.strokeStyle = gold ? 'rgba(255,235,170,0.4)' : 'rgba(230,235,255,0.25)'; ctx.lineWidth = .9;
+    ctx.beginPath(); ctx.arc(x, y, r * .62 + 1.3, 0, 7); ctx.stroke();
+    // насечка хвата по краю
+    ctx.strokeStyle = 'rgba(0,0,0,0.35)'; ctx.lineWidth = 1.2;
+    for (let i = 0; i < 10; i++) {
+      const a = i / 10 * Math.PI * 2;
+      ctx.beginPath();
+      ctx.moveTo(x + Math.cos(a) * r * .8, y + Math.sin(a) * r * .8);
+      ctx.lineTo(x + Math.cos(a) * r * .95, y + Math.sin(a) * r * .95);
+      ctx.stroke();
+    }
+    // блик
+    ctx.fillStyle = 'rgba(255,255,255,0.4)';
+    ctx.beginPath(); ctx.ellipse(x - r * .32, y - r * .44, r * .26, r * .14, -.6, 0, 7); ctx.fill();
     ctx.restore();
   }
-  // каменный сокет скилла
+  // каменный сокет скилла с золотыми когтями
   skillSocket(r) {
-    return this.hudCache('socket', r * 2 + 10, r * 2 + 10, (x, w) => {
+    return this.hudCache('socket2', r * 2 + 14, r * 2 + 14, (x, w) => {
       const c = w / 2;
+      x.fillStyle = 'rgba(0,0,0,0.4)';
+      x.beginPath(); x.ellipse(c, c + 3, r + 4, r + 1, 0, 0, 7); x.fill();
       const face = x.createRadialGradient(c, c - r * .3, r * .1, c, c, r);
-      face.addColorStop(0, '#262019'); face.addColorStop(1, '#0d0b08');
+      face.addColorStop(0, '#2a2318'); face.addColorStop(.85, '#0e0b07'); face.addColorStop(1, '#070503');
       x.fillStyle = face; x.beginPath(); x.arc(c, c, r, 0, 7); x.fill();
-      x.strokeStyle = '#8c6d1f'; x.lineWidth = 2.6; x.beginPath(); x.arc(c, c, r, 0, 7); x.stroke();
-      x.strokeStyle = 'rgba(0,0,0,0.7)'; x.lineWidth = 1.4; x.beginPath(); x.arc(c, c, r - 3.5, 0, 7); x.stroke();
-      x.strokeStyle = 'rgba(255,220,140,0.16)'; x.lineWidth = 1.2; x.beginPath(); x.arc(c, c, r + 3, 0, 7); x.stroke();
+      // золочёный обод с фаской
+      const rim = x.createLinearGradient(c, c - r, c, c + r);
+      rim.addColorStop(0, '#a4813a'); rim.addColorStop(.5, '#6a5016'); rim.addColorStop(1, '#2c1f08');
+      x.strokeStyle = rim; x.lineWidth = 3;
+      x.beginPath(); x.arc(c, c, r, 0, 7); x.stroke();
+      x.strokeStyle = 'rgba(0,0,0,0.7)'; x.lineWidth = 1.4; x.beginPath(); x.arc(c, c, r - 3.2, 0, 7); x.stroke();
+      x.strokeStyle = 'rgba(255,220,140,0.2)'; x.lineWidth = 1.1; x.beginPath(); x.arc(c, c, r + 2.6, 0, 7); x.stroke();
+      // четыре мини-когтя
+      for (let i = 0; i < 4; i++) {
+        const a = Math.PI / 4 + i * Math.PI / 2;
+        x.save();
+        x.translate(c + Math.cos(a) * r, c + Math.sin(a) * r);
+        x.rotate(a + Math.PI / 2);
+        x.fillStyle = '#8c6d1f';
+        x.beginPath(); x.moveTo(-3.4, -1.6); x.quadraticCurveTo(0, 6.5, 3.4, -1.6);
+        x.quadraticCurveTo(0, -3.8, -3.4, -1.6); x.closePath(); x.fill();
+        x.strokeStyle = 'rgba(0,0,0,0.55)'; x.lineWidth = .9; x.stroke();
+        x.restore();
+      }
     });
   }
-  // тёмная плашка с золотой окантовкой
+  // тёмная плашка со скошенными углами и двойным золотым кантом
   drawPlaque(ctx, x, y, w, h, align) {
     ctx.save();
     if (align === 'right') x -= w;
+    const cut = Math.min(6, h * .3);
+    const path = () => {
+      ctx.beginPath();
+      ctx.moveTo(x + cut, y); ctx.lineTo(x + w - cut, y); ctx.lineTo(x + w, y + cut);
+      ctx.lineTo(x + w, y + h - cut); ctx.lineTo(x + w - cut, y + h); ctx.lineTo(x + cut, y + h);
+      ctx.lineTo(x, y + h - cut); ctx.lineTo(x, y + cut); ctx.closePath();
+    };
     const gr = ctx.createLinearGradient(0, y, 0, y + h);
-    gr.addColorStop(0, 'rgba(24,19,11,0.88)'); gr.addColorStop(1, 'rgba(10,8,4,0.88)');
-    ctx.fillStyle = gr;
-    ctx.beginPath(); ctx.roundRect(x, y, w, h, 4); ctx.fill();
-    ctx.strokeStyle = 'rgba(140,109,31,0.7)'; ctx.lineWidth = 1.5; ctx.stroke();
+    gr.addColorStop(0, 'rgba(28,22,12,0.9)'); gr.addColorStop(1, 'rgba(10,8,4,0.9)');
+    ctx.fillStyle = gr; path(); ctx.fill();
+    ctx.strokeStyle = 'rgba(150,118,40,0.75)'; ctx.lineWidth = 1.4; ctx.stroke();
+    ctx.strokeStyle = 'rgba(255,225,150,0.1)'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(x + cut + 1, y + 1.5); ctx.lineTo(x + w - cut - 1, y + 1.5); ctx.stroke();
     ctx.restore();
     return align === 'right' ? x : x;
   }
@@ -429,7 +537,38 @@ export class UI {
   emptyCell(label) {
     return `<div class="cell empty"><span class="slotname">${label}</span></div>`;
   }
-  tooltip(it, actions) {
+  // сравнение с надетым предметом того же слота (как в D2)
+  compareHtml(it, ctx) {
+    if (!['bag', 'shop', 'stash'].includes(ctx)) return '';
+    const h = this.g.hero;
+    let slot = it.slot;
+    if (slot === 'ring') slot = h.equip.ring1 ? 'ring1' : 'ring2';
+    const cur = h.equip[slot];
+    if (!cur) return `<div class="cmphead">${STR.slotEmpty || 'слот свободен'}</div>`;
+    if (cur.id === it.id) return '';
+    const rows = [];
+    const push = (label, nv, ov, pct) => {
+      const d = (nv || 0) - (ov || 0);
+      if (Math.abs(d) < .05) return;
+      const val = pct ? Math.round(Math.abs(d) * 100) + '%' : Math.round(Math.abs(d) * 10) / 10;
+      rows.push(`<div class="cmp ${d > 0 ? 'up' : 'down'}">${d > 0 ? '▲' : '▼'} ${label} ${d > 0 ? '+' : '−'}${val}</div>`);
+    };
+    if (it.dmg || cur.dmg) push(STR.dmg, it.dmg ? (it.dmg[0] + it.dmg[1]) / 2 : 0, cur.dmg ? (cur.dmg[0] + cur.dmg[1]) / 2 : 0);
+    push(STR.armor, it.armor, cur.armor);
+    const keys = new Set([...Object.keys(it.stats || {}), ...Object.keys(cur.stats || {})]);
+    const NAME = { dmgFlat: 'урон', dmgMul: 'урон%', aspd: 'скор. атаки', crit: 'крит', critDmg: 'крит. урон', plusSkills: 'умения',
+      leech: 'вампиризм', hpFlat: 'здоровье', hpRegen: 'реген', armorFlat: 'броня', armorMul: 'броня%', resAll: 'все сопр.',
+      resFire: 'сопр. огню', resCold: 'сопр. холоду', resLight: 'сопр. молнии', resPoison: 'сопр. яду', moveMul: 'бег',
+      goldFind: 'золото', magicFind: 'находки', str: 'сила', dex: 'ловкость', int: 'интеллект', vit: 'живучесть', spellDmg: 'урон умений', potions: 'зелья',
+      vsUndead: 'урон нежити', vsDemon: 'урон демонам', lightR: 'свет', cdr: 'перезарядка', resMax: 'запас ресурса', thorns: 'шипы', blockCh: 'блок' };
+    for (const k of keys) {
+      const pct = /Mul|leech|goldFind|magicFind|lightR|spellDmg|cdr|vsUndead|vsDemon|aspd/.test(k);
+      push(NAME[k] || k, (it.stats || {})[k], (cur.stats || {})[k], pct);
+    }
+    if (!rows.length) return '';
+    return `<div class="cmphead">против «${esc(cur.name)}»</div>${rows.slice(0, 6).join('')}`;
+  }
+  tooltip(it, actions, ctx) {
     const st = [];
     if (it.dmg) st.push(`${STR.dmg}: ${it.dmg[0]}–${it.dmg[1]} (${it.aspd}/с)`);
     if (it.armor) st.push(`${STR.armor}: ${it.armor}`);
@@ -447,12 +586,16 @@ export class UI {
     }
     if (it.setId) { const set = SETS.find(s => s.id === it.setId); st.push(`<i>${esc(set.name)} (сет)</i>`); }
     if (it.lore) st.push(`<i class="lore">«${esc(it.lore)}»</i>`);
+    const hint = ctx === 'bag' ? `<div class="tthint">двойной тап по предмету — надеть</div>`
+      : ctx === 'equip' ? `<div class="tthint">двойной тап — снять</div>` : '';
     return `<div class="tt">
       <div class="ttname" style="color:${RC[it.rarity]}">${esc(it.name)}</div>
       ${it.typeName ? `<div class="ttt">${esc(it.typeName)}</div>` : ''}
       <div class="ttreq">${STR.requires}: ${it.req} ${STR.levelShort} · ${it.price} ✦</div>
       ${st.map(x => `<div class="tts">${x}</div>`).join('')}
-      <div class="ttbtns">${actions.map(a => `<button data-act="${a[0]}" data-id="${it.id}">${a[1]}</button>`).join('')}</div>
+      ${this.compareHtml(it, ctx)}
+      <div class="ttbtns">${actions.map((a, i) => `<button ${i === 0 ? 'class="primary"' : ''} data-act="${a[0]}" data-id="${it.id}">${a[1]}</button>`).join('')}</div>
+      ${hint}
     </div>`;
   }
 
@@ -686,7 +829,20 @@ export class UI {
           const it = makeItem(g.rng, h.level + g.rng.int(0, 3), { magicFind: .8 });
           h.inventory.push(it); this.toast(it.name, RC[it.rarity]); this.render(); break;
         }
-        case 'item': this.showTooltip(b, id, b.dataset.ctx); break;
+        case 'item': { // двойной тап: bag → надеть, equip → снять
+          const now = performance.now();
+          const key = b.dataset.ctx + '|' + id;
+          if (this._tapKey === key && now - this._tapT < 420) {
+            this._tapKey = null;
+            if (b.dataset.ctx === 'bag') { g.equipItem(Number(id)); this.render(); }
+            else if (b.dataset.ctx === 'equip') { g.unequipItem(id); this.render(); }
+            else this.showTooltip(b, id, b.dataset.ctx);
+          } else {
+            this._tapKey = key; this._tapT = now;
+            this.showTooltip(b, id, b.dataset.ctx);
+          }
+          break;
+        }
         case 'equipIt': g.equipItem(Number(id)); this.render(); break;
         case 'unequipIt': g.unequipItem(id); this.render(); break;
         case 'sellIt': { const it = find(h.inventory, id); if (it) { h.inventory = h.inventory.filter(x => x !== it); h.gold += Math.floor(it.price / 3); this.render(); } break; }
@@ -717,6 +873,6 @@ export class UI {
     }[ctx];
     // экипировка из сундука недоступна — только через инвентарь (честно и просто)
     const box = this.root.querySelector('#ttbox');
-    if (box) { box.innerHTML = this.tooltip(it, acts); box.style.display = 'block'; }
+    if (box) { box.innerHTML = this.tooltip(it, acts, ctx); box.style.display = 'block'; }
   }
 }
