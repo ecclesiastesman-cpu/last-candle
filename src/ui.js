@@ -15,8 +15,20 @@ export class UI {
     this.root = document.getElementById('ui');
     this.screen = null; // 'inventory'|'character'|'talents'|'town'|'vendor'|'stash'|'death'|null
     this.statNames = { str: STR.stats.str, dex: STR.stats.dex, int: STR.stats.int, vit: STR.stats.vit };
-    bus.on('levelUp', lvl => this.toast(`${STR.levelUp} ${lvl}`, '#ffd75e'));
+    bus.on('levelUp', lvl => { if (typeof lvl === 'number') game.banner = { text: `УРОВЕНЬ ${lvl}`, t: 2.2 }; });
+    bus.on('skillUnlocked', sk => this.skillCard(sk));
     bus.on('pickupItem', (r, name) => { if (r !== 'common') this.toast(name, RC[r]); });
+  }
+  // карточка нового умения (DI-стиль): по центру сверху, с иконкой
+  skillCard(sk) {
+    this.root.querySelector('.skillcard')?.remove();
+    const id = Object.keys(SKILLS).find(k => SKILLS[k] === sk);
+    const el = document.createElement('div');
+    el.className = 'skillcard';
+    el.innerHTML = `<img src="./assets/skills/${id}.webp" alt="" onerror="this.remove()">
+      <div><b>Новое умение</b><span>${sk.name}</span><i>${sk.d}</i></div>`;
+    this.root.appendChild(el);
+    setTimeout(() => el.remove(), 4200);
   }
   // DI-попап: подобрано улучшение — «Надеть?» одним тапом
   equipPrompt(it, retried) {
@@ -403,13 +415,13 @@ export class UI {
       ctx.restore();
       // скиллы дугой над прицельным стиком
       const bar = g.hero.skillBar;
-      const sock = this.skillSocket(25);
+      const sock = this.skillSocket(27);
       bar.forEach((id, i) => {
         if (!id) return;
-        const ang = land ? Math.PI * (1.12 + i * .195) : Math.PI * (1.02 + i * .17);
-        const rad = land ? 100 : 108;
+        const ang = land ? Math.PI * (1.04 + i * .155) : Math.PI * (1.02 + i * .17);
+        const rad = land ? 88 : 108;
         const pos = { x: asx + Math.cos(ang) * rad, y: asy + Math.sin(ang) * rad };
-        input.addButton('sk' + (i + 1), pos.x, pos.y, 26, 'skill' + (i + 1));
+        input.addButton('sk' + (i + 1), pos.x, pos.y, 28, 'skill' + (i + 1));
         const usable = canUse(g, id);
         ctx.globalAlpha = usable ? 1 : .38;
         ctx.drawImage(sock, pos.x - sock.width / 2, pos.y - sock.height / 2);
@@ -420,12 +432,36 @@ export class UI {
           ctx.fillStyle = 'rgba(0,0,0,0.68)';
           ctx.beginPath(); ctx.moveTo(pos.x, pos.y);
           ctx.arc(pos.x, pos.y, 25, -Math.PI / 2, -Math.PI / 2 + (cd / SKILLS[id].cd) * 7); ctx.fill();
+          if (cd > .35) { // цифра секунд, как в DI
+            ctx.fillStyle = '#fff'; ctx.font = 'bold 15px Georgia'; ctx.textAlign = 'center';
+            ctx.strokeStyle = 'rgba(0,0,0,0.85)'; ctx.lineWidth = 3;
+            const txt = cd >= 1 ? Math.ceil(cd) : cd.toFixed(1);
+            ctx.strokeText(txt, pos.x, pos.y + 5);
+            ctx.fillText(txt, pos.x, pos.y + 5);
+          }
         } else if (usable) { // готово: тонкое свечение
           ctx.strokeStyle = 'rgba(255,215,120,0.35)'; ctx.lineWidth = 1.6;
           ctx.beginPath(); ctx.arc(pos.x, pos.y, 27.5, 0, 7); ctx.stroke();
         }
         ctx.globalAlpha = 1;
       });
+      // активные баффы: ряд иконок с кольцом длительности (DI-стиль)
+      const bfs = g.hero.buffs;
+      if (bfs.length) {
+        bfs.slice(0, 4).forEach((b, i) => {
+          const bx = asx - 30 + i * 34, by = asy - 158;
+          const ic = this.skillIcon(b.id);
+          ctx.save();
+          ctx.fillStyle = 'rgba(10,8,5,0.75)';
+          ctx.beginPath(); ctx.arc(bx, by, 15, 0, 7); ctx.fill();
+          if (ic) ctx.drawImage(ic, bx - 11, by - 11, 22, 22);
+          const sk = SKILLS[b.id];
+          const frac = sk?.dur ? clamp(b.t / sk.dur, 0, 1) : 1;
+          ctx.strokeStyle = '#7fd68a'; ctx.lineWidth = 2.2;
+          ctx.beginPath(); ctx.arc(bx, by, 15, -Math.PI / 2, -Math.PI / 2 + frac * Math.PI * 2); ctx.stroke();
+          ctx.restore();
+        });
+      }
       // зелье-колба у орба HP
       const px = potPos[0], py = potPos[1];
       input.addButton('potion', px, py, 26, 'potion');
@@ -538,14 +574,16 @@ export class UI {
   drawMinimap(ctx, g, W, land) {
     const f = g.floor;
     if (!f) return;
-    const size = land ? 82 : 96, cell = size / Math.max(f.W, f.H);
+    const size = land ? 86 : 96, cell = size / Math.max(f.W, f.H);
     const mx = W - size - (land ? 58 : 10), my = land ? 46 : 84;
+    const cx = mx + size / 2, cy = my + size / 2, R = size / 2 + 3;
     ctx.save();
-    ctx.globalAlpha = .82;
-    ctx.fillStyle = 'rgba(6,5,3,0.75)';
-    ctx.fillRect(mx - 3, my - 3, size + 6, size + 6);
-    ctx.strokeStyle = '#5c4a1e'; ctx.lineWidth = 1.5;
-    ctx.strokeRect(mx - 3, my - 3, size + 6, size + 6);
+    ctx.globalAlpha = .85;
+    // круглая линза (DI-стиль)
+    ctx.beginPath(); ctx.arc(cx, cy, R, 0, 7);
+    ctx.fillStyle = 'rgba(6,5,3,0.8)'; ctx.fill();
+    ctx.save();
+    ctx.beginPath(); ctx.arc(cx, cy, R - 1, 0, 7); ctx.clip();
     for (let ty = 0; ty < f.H; ty++) {
       for (let tx = 0; tx < f.W; tx++) {
         if (!f.visited[ty * f.W + tx]) continue;
@@ -581,6 +619,24 @@ export class UI {
     // герой
     ctx.fillStyle = '#e8dcc0';
     ctx.beginPath(); ctx.arc(mx + g.hero.x / 64 * cell, my + g.hero.y / 64 * cell, 2.2, 0, 7); ctx.fill();
+    ctx.restore(); // конец клипа линзы
+    // золотое компасное кольцо с насечками и меткой севера
+    const ring = ctx.createLinearGradient(cx, cy - R, cx, cy + R);
+    ring.addColorStop(0, '#b8934a'); ring.addColorStop(.5, '#6a5016'); ring.addColorStop(1, '#3a2a0c');
+    ctx.strokeStyle = ring; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(cx, cy, R, 0, 7); ctx.stroke();
+    ctx.strokeStyle = 'rgba(255,225,150,0.25)'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(cx, cy, R + 2, 0, 7); ctx.stroke();
+    ctx.strokeStyle = 'rgba(216,178,90,0.7)'; ctx.lineWidth = 1.6;
+    for (let i = 0; i < 8; i++) {
+      const a = i * Math.PI / 4;
+      ctx.beginPath();
+      ctx.moveTo(cx + Math.cos(a) * (R - 3), cy + Math.sin(a) * (R - 3));
+      ctx.lineTo(cx + Math.cos(a) * (R + 1), cy + Math.sin(a) * (R + 1));
+      ctx.stroke();
+    }
+    ctx.fillStyle = '#ffd75e'; ctx.font = 'bold 9px Georgia'; ctx.textAlign = 'center';
+    ctx.fillText('С', cx, cy - R + 10);
     ctx.restore();
     ctx.globalAlpha = 1;
   }
@@ -725,7 +781,7 @@ export class UI {
   }
 
   // кадр героя (юг, stance) из собранного листа — «кукла» для меню
-  heroDollUrl(scale = 1.6) {
+  heroDollUrl(scale = 2.2) {
     const s = this.g.flare?.heroSheet;
     if (!s) return null;
     const anim = s.meta.anims.stance;
@@ -765,6 +821,7 @@ export class UI {
     const doll = this.heroDollUrl();
     const S = sl => h.equip[sl] ? this.itemHtml(h.equip[sl], 'equip') : this.emptyCell(STR.slots[sl]);
     return `${this.tabs('inventory')}
+    <div class="powerline">⚔ Сила героя: <b>${this.g.stats.power}</b></div>
     <div class="invwrap">
     <div class="invleft">
       <div class="paperdoll">
@@ -790,15 +847,16 @@ export class UI {
       [STR.dmg, Math.round(s.dmgTotal)], [STR.aspd, s.attackSpeed.toFixed(2) + '/с'],
       [STR.crit, Math.round(s.critCh) + '% ×' + (1.5 + s.critDmg).toFixed(1)],
       ['HP', `${Math.ceil(h.hp)}/${s.maxHp}`], [STR.armor, s.armor],
-      [STR.resFire, s.resFire + '%'], [STR.resCold, s.resCold + '%'], [STR.resLight, s.resLight + '%'], [STR.resPoison, s.resPoison + '%'],
+      [STR.resFire, Math.round(s.resFire) + '%'], [STR.resCold, Math.round(s.resCold) + '%'], [STR.resLight, Math.round(s.resLight) + '%'], [STR.resPoison, Math.round(s.resPoison) + '%'],
       ['Скорость', Math.round(s.moveSpeed)], ['Магич. находки', Math.round(s.magicFind * 100) + '%'],
     ];
     return `${this.tabs('character')}
     <div class="cols"><div>
       <div class="h2">${STR.classes[h.cls].name} · ${STR.level} ${h.level}</div>
+      <div class="powerline">⚔ Сила героя: <b>${s.power}</b></div>
       <div class="xpline">${STR.exp}: ${h.xp}/${h.xpNext}</div>
       <div class="h2">${STR.statPoints}: <b>${h.statPts}</b></div>
-      ${['str', 'dex', 'int', 'vit'].map(k => `<div class="statrow">${this.statNames[k]}: <b>${this.g.stats[k]}</b>
+      ${['str', 'dex', 'int', 'vit'].map(k => `<div class="statrow">${this.statNames[k]}: <b>${Math.round(this.g.stats[k])}</b>
         ${h.statPts > 0 ? `<button data-act="stat" data-id="${k}">+</button>` : ''}</div>`).join('')}
     </div><div>
       <div class="h2">Сводка</div>

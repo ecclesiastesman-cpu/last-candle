@@ -102,7 +102,7 @@ canvas{display:block;position:fixed;inset:0}
   box-shadow:inset 0 0 36px rgba(0,0,0,.75), 0 4px 14px rgba(0,0,0,.5)}
 .paperdoll .dcol{display:flex;flex-direction:column;gap:7px;align-items:center}
 .paperdoll .dollimg{text-align:center}
-.paperdoll .dollimg img{height:clamp(130px, 26vh, 195px);filter:drop-shadow(0 8px 10px rgba(0,0,0,.7))}
+.paperdoll .dollimg img{height:clamp(150px, 32vh, 235px);filter:drop-shadow(0 8px 10px rgba(0,0,0,.7))}
 .eslot{font-size:13px;color:#8d8574;margin:4px 0}
 .empty{color:#4a443a}
 .gold{margin:10px 0;font-size:16px;font-family:'Forum',Georgia,serif}
@@ -128,7 +128,7 @@ button.primary{background:linear-gradient(#7a5c14,#3a2a08);border-color:#d8b25a;
 .talent.locked{opacity:.45}
 .talent.known .tname{color:#ffd75e}
 .tname{font-size:15px;font-family:'Forum',Georgia,serif;letter-spacing:.3px}
-.tname .ticon{width:20px;height:20px;vertical-align:-4px;margin-right:6px;filter:drop-shadow(0 1px 2px rgba(0,0,0,.7))}
+.tname .ticon{width:30px;height:30px;vertical-align:-9px;margin-right:8px;filter:drop-shadow(0 1px 2px rgba(0,0,0,.7))}
 .pips{letter-spacing:2px;font-size:11px;color:#4a3f22}
 .pips b{color:#ffd75e}
 .tdesc{font-size:12px;color:#8d8574;margin:2px 0}
@@ -155,6 +155,19 @@ button.primary{background:linear-gradient(#7a5c14,#3a2a08);border-color:#d8b25a;
   border:1px solid #a4813a;outline:1px solid #241a08;outline-offset:2px;
   box-shadow:0 12px 34px rgba(0,0,0,.7), inset 0 0 18px rgba(0,0,0,.6)}
 .dlgtext{font-size:16px;color:#cfc4a2;font-style:italic;line-height:1.55;margin:14px 6px 18px}
+.powerline{font-family:'Forum',Georgia,serif;font-size:16px;color:#9a8f72;text-align:center;margin:6px 0}
+.powerline b{color:#ffd75e;font-size:20px;text-shadow:0 0 12px rgba(255,190,80,.35)}
+/* карточка нового умения (левелап) */
+.skillcard{position:fixed;left:50%;transform:translateX(-50%);top:64px;z-index:9;
+  display:flex;align-items:center;gap:12px;padding:10px 18px;max-width:380px;
+  background:linear-gradient(#241b0c,#120d06);border:1px solid #d8b25a;outline:1px solid #241a08;outline-offset:2px;
+  box-shadow:0 10px 30px rgba(0,0,0,.75), 0 0 24px rgba(255,190,80,.2), inset 0 0 14px rgba(255,190,80,.08);
+  animation:epin .3s ease-out;pointer-events:none}
+.skillcard img{width:44px;height:44px}
+.skillcard div{display:flex;flex-direction:column;font-size:12px;min-width:0}
+.skillcard b{color:#ffd75e;font-family:'Forum',Georgia,serif;font-size:13px;letter-spacing:.6px;text-transform:uppercase}
+.skillcard span{color:#e8dcc0;font-family:'Forum',Georgia,serif;font-size:17px}
+.skillcard i{color:#8d8574;font-style:normal;font-size:11.5px}
 /* DI-попап «Надеть?» при подборе улучшения */
 .equipprompt{position:fixed;left:50%;transform:translateX(-50%);top:60px;z-index:8;
   display:flex;align-items:center;gap:8px;padding:8px 10px;max-width:300px;
@@ -177,7 +190,7 @@ button.primary{background:linear-gradient(#7a5c14,#3a2a08);border-color:#d8b25a;
   .invleft{flex:0 0 46%;max-width:470px;min-width:0}
   .invright{flex:1;min-width:0}
   .panel>.paperdoll, .invleft .paperdoll{max-width:none}
-  .paperdoll .dollimg img{height:clamp(120px, 34vh, 190px)}
+  .paperdoll .dollimg img{height:clamp(150px, 44vh, 240px)}
   /* карточка предмета — колонкой справа, не съедает экран */
   #ttbox .tt{position:fixed;right:calc(12px + env(safe-area-inset-right));top:72px;bottom:auto;
     width:300px;max-height:calc(100vh - 96px);overflow-y:auto;z-index:6;

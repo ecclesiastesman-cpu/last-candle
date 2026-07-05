@@ -546,7 +546,17 @@ class Game {
       tg.t += dt;
       if (tg.t >= tg.dur) { this.telegraphs.splice(i, 1); if (tg.hit) tg.hit(); }
     }
-    for (let i = this.corpses.length - 1; i >= 0; i--) { this.corpses[i].t += dt; if (this.corpses[i].t > 4) this.corpses.splice(i, 1); }
+    for (let i = this.corpses.length - 1; i >= 0; i--) {
+      const c = this.corpses[i];
+      c.t += dt;
+      if (c.vx || c.vy) { // тело отлетает от добивающего удара
+        c.x += c.vx * dt; c.y += c.vy * dt;
+        const dec = Math.max(0, 1 - 7 * dt);
+        c.vx *= dec; c.vy *= dec;
+        if (Math.abs(c.vx) + Math.abs(c.vy) < 8) c.vx = c.vy = 0;
+      }
+      if (c.t > 4) this.corpses.splice(i, 1);
+    }
     if (h.dead) { h.deadT = (h.deadT || 0) + dt; return; }
     h.animT += dt;
     if (h.action) { h.action.t += dt * 1000; if (h.action.t > 520) h.action = null; }

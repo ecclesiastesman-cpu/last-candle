@@ -11,7 +11,7 @@ export class Renderer {
     this.ctx = canvas.getContext('2d', { alpha: false });
     this.assets = assets;
     this.cam = { x: 0, y: 0, shake: 0 };
-    this.particles = []; this.numbers = []; this.flashes = [];
+    this.particles = []; this.numbers = []; this.flashes = []; this.pillars = []; this.rings = []; this.slashes = [];
     this.tintCache = new Map();
     this.lightCanvas = document.createElement('canvas');
     this.zoom = 1;
@@ -49,6 +49,20 @@ export class Renderer {
     this.canvas.style.width = innerWidth + 'px'; this.canvas.style.height = innerHeight + 'px';
     this.lightCanvas.width = Math.ceil(innerWidth / 4); this.lightCanvas.height = Math.ceil(innerHeight / 4);
     this.zoom = clamp(Math.min(innerWidth, innerHeight) / 760, .5, .95);
+  }
+  // предзапечённое радиальное свечение (замена shadowBlur в горячих циклах)
+  glowSprite(color) {
+    this._glows = this._glows || new Map();
+    let c = this._glows.get(color);
+    if (!c) {
+      c = document.createElement('canvas'); c.width = c.height = 32;
+      const x = c.getContext('2d');
+      const gr = x.createRadialGradient(16, 16, 1, 16, 16, 16);
+      gr.addColorStop(0, color); gr.addColorStop(1, 'rgba(0,0,0,0)');
+      x.fillStyle = gr; x.fillRect(0, 0, 32, 32);
+      this._glows.set(color, c);
+    }
+    return c;
   }
   // тонированный спрайт с кэшем
   tinted(img, tint, alpha = .55) {
@@ -465,7 +479,7 @@ export class Renderer {
       ctx.lineWidth = 2.5; ctx.beginPath(); ctx.arc(0, 4, m.r * 1.4, 0, 7); ctx.stroke();
       ctx.globalAlpha = 1;
     }
-    if (m.hitT > 0) { ctx.globalAlpha = .9; try { ctx.filter = 'brightness(2.1) saturate(0.55)'; } catch {} } // белая вспышка попадания
+    if (m.hitT > 0) ctx.globalAlpha = .82; // вспышку даёт fx.impact — canvas-filter на iOS дорог
     if (m.freezeT > 0) { ctx.filter = 'saturate(0.3) brightness(1.3)'; }
     let drawn = false;
     if (m.flare && g.flare) {
@@ -491,6 +505,17 @@ export class Renderer {
     }
     ctx.restore();
     ctx.filter = 'none'; ctx.globalAlpha = 1;
+    if (m.elite && m.aggro && !m.boss) { // подпись аффикса элитки
+      const AFN = { fast: 'Стремительный', fire: 'Огненный', cold: 'Ледяной', vampiric: 'Кровопийца', storm: 'Грозовой' };
+      const [apx, apy] = proj(m.x, m.y);
+      ctx.font = 'bold 10.5px Georgia, serif'; ctx.textAlign = 'center';
+      ctx.strokeStyle = 'rgba(0,0,0,0.85)'; ctx.lineWidth = 3;
+      const label = AFN[m.elite] || '';
+      const yy = apy - size * .62 - (m.name ? 26 : 10);
+      ctx.strokeText(label, apx, yy);
+      ctx.fillStyle = m.tint || '#ffd54f';
+      ctx.fillText(label, apx, yy);
+    }
     if (m.name) { // именной редкий: табличка
       const [npx, npy] = proj(m.x, m.y);
       ctx.font = 'bold 12px Georgia, serif'; ctx.textAlign = 'center';
@@ -499,12 +524,17 @@ export class Renderer {
       ctx.fillStyle = '#ffd54f';
       ctx.fillText(m.name, npx, npy - size * .7);
     }
-    if (m.hp < m.maxHp && !m.boss) { // полоска HP
+    if (m.hp < m.maxHp && !m.boss) { // полоска HP: рамка + ghost-след снятого
       const [bpx, bpy] = proj(m.x, m.y);
-      const w = m.r * 2.4;
-      ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(bpx - w / 2, bpy - size * .62, w, 4);
-      ctx.fillStyle = m.elite ? '#ffd54f' : '#a3162e';
-      ctx.fillRect(bpx - w / 2, bpy - size * .62, w * clamp(m.hp / m.maxHp, 0, 1), 4);
+      const w = m.r * 2.4, bh = 5, bx = bpx - w / 2, by = bpy - size * .62;
+      m.hpGhost = m.hpGhost === undefined ? m.hp : Math.max(m.hp, m.hpGhost - m.maxHp * 1.6 / 60);
+      ctx.fillStyle = 'rgba(0,0,0,0.65)'; ctx.fillRect(bx - 1, by - 1, w + 2, bh + 2);
+      const fr = clamp(m.hp / m.maxHp, 0, 1), gr2 = clamp(m.hpGhost / m.maxHp, 0, 1);
+      if (gr2 > fr) { ctx.fillStyle = '#ffe8c0'; ctx.fillRect(bx, by, w * gr2, bh); }
+      ctx.fillStyle = m.elite ? '#b388ff' : '#c22135';
+      ctx.fillRect(bx, by, w * fr, bh);
+      ctx.strokeStyle = 'rgba(255,255,255,0.3)'; ctx.lineWidth = 1;
+      ctx.strokeRect(bx - .5, by - .5, w + 1, bh + 1);
     }
   }
 
@@ -534,7 +564,12 @@ export class Renderer {
       } else {
         const col = ({ common: '#c8c2b8', magic: '#7aa9ff', rare: '#ffd75e', set: '#61d97a', unique: '#ff9840' })[d.item.rarity];
         ctx.save();
-        ctx.shadowColor = col; ctx.shadowBlur = d.item.rarity === 'common' ? 4 : 12 + Math.sin(timeS * 4) * 4;
+        if (d.item.rarity !== 'common') {
+          const gs = this.glowSprite(col);
+          ctx.globalAlpha = .5 + Math.sin(timeS * 4) * .15;
+          ctx.drawImage(gs, dpx - 22, y - 22, 44, 44);
+          ctx.globalAlpha = 1;
+        }
         const icon = this.assets[d.item.icon];
         if (icon) ctx.drawImage(icon, dpx - 15, y - 15, 30, 30);
         else { ctx.fillStyle = col; ctx.fillRect(dpx - 8, y - 8, 16, 16); }
@@ -624,9 +659,75 @@ export class Renderer {
       const [ppx, ppy] = proj(p.x, p.y);
       ctx.translate(ppx, ppy);
       ctx.rotate(Math.atan2((p.vx + p.vy) * ISOY, (p.vx - p.vy) * ISOX));
-      if (p.arrow) { ctx.strokeStyle = '#e8dcc0'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(-9, 0); ctx.lineTo(9, 0); ctx.stroke(); }
-      else { ctx.shadowColor = p.color; ctx.shadowBlur = 10; ctx.fillStyle = p.color; ctx.beginPath(); ctx.arc(0, 0, p.r, 0, 7); ctx.fill(); }
+      if (p.arrow) { ctx.strokeStyle = '#e8dcc0'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(-11, 0); ctx.lineTo(9, 0); ctx.stroke();
+        ctx.strokeStyle = 'rgba(232,220,192,0.35)'; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(-20, 0); ctx.lineTo(-11, 0); ctx.stroke(); }
+      else {
+        const gs = this.glowSprite(p.color);
+        ctx.globalAlpha = .55; ctx.drawImage(gs, -16, -16, 32, 32); ctx.globalAlpha = 1;
+        ctx.fillStyle = p.color; ctx.beginPath(); ctx.arc(0, 0, p.r, 0, 7); ctx.fill();
+        ctx.fillStyle = 'rgba(255,255,255,0.7)'; ctx.beginPath(); ctx.arc(-p.r * .25, -p.r * .25, p.r * .4, 0, 7); ctx.fill();
+      }
       ctx.restore();
+    }
+    // кольца-росчерки (новы, вихрь)
+    for (let i = this.rings.length - 1; i >= 0; i--) {
+      const rg = this.rings[i];
+      rg.t -= dt; if (rg.t <= 0) { this.rings.splice(i, 1); continue; }
+      const f = 1 - rg.t / rg.dur;
+      const [px, py] = proj(rg.xw, rg.yw);
+      ctx.save();
+      ctx.translate(px, py);
+      ctx.scale(ISOX, ISOY);
+      ctx.globalAlpha = (rg.t / rg.dur) * .9;
+      ctx.lineCap = 'round';
+      const rot = f * 5;
+      for (let k = 0; k < 2; k++) {
+        ctx.strokeStyle = k ? 'rgba(255,255,255,0.55)' : rg.c;
+        ctx.lineWidth = (k ? 4 : 11) * (rg.t / rg.dur) + 1;
+        ctx.beginPath(); ctx.arc(0, 0, rg.r * (0.35 + f * .75), rot + k * Math.PI, rot + k * Math.PI + 2.4); ctx.stroke();
+      }
+      ctx.restore();
+      ctx.globalAlpha = 1;
+    }
+    // серпы ударов
+    for (let i = this.slashes.length - 1; i >= 0; i--) {
+      const sl = this.slashes[i];
+      sl.t -= dt; if (sl.t <= 0) { this.slashes.splice(i, 1); continue; }
+      const f = sl.t / sl.dur;
+      const [px, py] = proj(sl.xw, sl.yw);
+      ctx.save();
+      ctx.translate(px, py);
+      ctx.scale(ISOX, ISOY);
+      ctx.globalAlpha = f * .85;
+      const spread = .95 * (1.4 - f * .4);
+      ctx.fillStyle = 'rgba(255,240,200,0.8)';
+      ctx.beginPath();
+      ctx.arc(0, 0, sl.r * 1.15, sl.ang - spread, sl.ang + spread);
+      ctx.arc(0, 0, sl.r * .55, sl.ang + spread, sl.ang - spread, true);
+      ctx.closePath(); ctx.fill();
+      ctx.restore();
+      ctx.globalAlpha = 1;
+    }
+    // столбы света (левелап)
+    for (let i = this.pillars.length - 1; i >= 0; i--) {
+      const pl = this.pillars[i];
+      pl.t -= dt; if (pl.t <= 0) { this.pillars.splice(i, 1); continue; }
+      const [px, py] = proj(pl.x, pl.y);
+      const a = Math.min(1, pl.t * 2.2);
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      const w = 34 + (1.1 - pl.t) * 26;
+      const grad = ctx.createLinearGradient(px, py - 320, px, py + 10);
+      grad.addColorStop(0, 'rgba(255,215,94,0)');
+      grad.addColorStop(.55, `rgba(255,215,94,${.28 * a})`);
+      grad.addColorStop(1, `rgba(255,235,170,${.5 * a})`);
+      ctx.fillStyle = grad;
+      ctx.fillRect(px - w / 2, py - 320, w, 330);
+      ctx.globalAlpha = .8 * a;
+      ctx.fillStyle = '#ffe9a0';
+      ctx.beginPath(); ctx.ellipse(px, py + 4, w * .62, w * .22, 0, 0, 7); ctx.fill();
+      ctx.restore();
+      ctx.globalAlpha = 1;
     }
     // частицы
     const ps = this.particles;
@@ -639,15 +740,22 @@ export class Renderer {
       ctx.fillRect(p.x - p.s / 2, p.y - p.s / 2, p.s, p.s);
     }
     ctx.globalAlpha = 1;
-    // числа урона
+    // числа урона: дуга разлёта + pop на старте (DI-вес)
     for (let i = this.numbers.length - 1; i >= 0; i--) {
       const n = this.numbers[i];
       n.t -= dt; if (n.t <= 0) { this.numbers.splice(i, 1); continue; }
-      n.y -= 34 * dt;
+      if (n.vx !== undefined) { n.x += n.vx * dt; n.y += n.vy * dt; n.vy += n.grav * dt; }
+      else n.y -= 34 * dt;
+      ctx.save();
       ctx.globalAlpha = Math.min(1, n.t * 3);
-      ctx.font = (n.big ? 'bold 17px' : 'bold 13px') + ' Georgia, serif';
-      ctx.strokeStyle = 'rgba(0,0,0,0.8)'; ctx.lineWidth = 3; ctx.strokeText(n.txt, n.x, n.y);
-      ctx.fillStyle = n.c; ctx.fillText(n.txt, n.x, n.y);
+      const pop = n.t > .68 ? 1.55 - (0.8 - n.t) * 4.6 : 1;
+      ctx.translate(n.x, n.y);
+      ctx.scale(pop, pop);
+      ctx.font = (n.big ? 'bold 26px' : 'bold 16px') + ' Georgia, serif';
+      ctx.textAlign = 'center';
+      ctx.strokeStyle = 'rgba(0,0,0,0.85)'; ctx.lineWidth = n.big ? 4.5 : 3.2; ctx.strokeText(n.txt, 0, 0);
+      ctx.fillStyle = n.c; ctx.fillText(n.txt, 0, 0);
+      ctx.restore();
     }
     ctx.globalAlpha = 1;
   }
@@ -729,16 +837,39 @@ export class Renderer {
     const self = this;
     const P = (x, y) => proj(x, y);
     return {
-      number(xw, yw, v, c, big) { const [x, y] = P(xw, yw); if (self.numbers.length < 60) self.numbers.push({ x, y, txt: String(v), c, t: .8, big }); },
+      number(xw, yw, v, c, big) {
+        const [x, y] = P(xw, yw);
+        if (self.numbers.length < 60) self.numbers.push({ x, y, txt: String(v), c, t: .8, big,
+          vx: (Math.random() - .5) * 90, vy: -(95 + Math.random() * 55), grav: 175 });
+      },
       text(xw, yw, txt, c) { const [x, y] = P(xw, yw); self.numbers.push({ x, y, txt, c, t: 1.2, big: true }); },
       burst(xw, yw, n, c) { const [x, y] = P(xw, yw); for (let i = 0; i < n && self.particles.length < 300; i++) { const a = Math.random() * 7, sp = 40 + Math.random() * 120; self.particles.push({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 40, t: .4 + Math.random() * .4, c, s: 2 + Math.random() * 3, grav: 300 }); } },
       explosion(xw, yw, r, c) { const x = xw, y = yw; this.burst(x, y, 26, c); self.cam.shake = Math.max(self.cam.shake, 10); },
-      slash(xw, yw, ang, r) { const [x, y] = P(xw, yw); for (let i = 0; i < 6 && self.particles.length < 300; i++) { const a = ang + (Math.random() - .5) * 1; self.particles.push({ x: x + Math.cos(a) * r * .7, y: y + Math.sin(a) * r * .7, vx: Math.cos(a) * 90, vy: Math.sin(a) * 90, t: .18, c: '#e8dcc0', s: 2.5 }); } },
-      nova(xw, yw, r, c) { const [x, y] = P(xw, yw); for (let i = 0; i < 22 && self.particles.length < 300; i++) { const a = i / 22 * 7; self.particles.push({ x, y, vx: Math.cos(a) * r * 2.4, vy: Math.sin(a) * r * 2.4, t: .4, c, s: 3.5 }); } },
+      slash(xw, yw, ang, r) { // серп-росчерк клинка
+        if (self.slashes.length < 12) self.slashes.push({ xw, yw, ang, r, t: .14, dur: .14 });
+      },
+      nova(xw, yw, r, c) { // расширяющееся кольцо-росчерк
+        if (self.rings.length < 10) self.rings.push({ xw, yw, r, c, t: .3, dur: .3 });
+        const [x, y] = P(xw, yw);
+        for (let i = 0; i < 8 && self.particles.length < 300; i++) { const a = i / 8 * 7; self.particles.push({ x, y, vx: Math.cos(a) * r * 2.2, vy: Math.sin(a) * r * 2.2, t: .35, c, s: 3 }); }
+      },
+      impact(xw, yw, dx2, dy2, c) { // искры из точки контакта вдоль вектора удара
+        const [x, y] = P(xw, yw);
+        for (let i = 0; i < 4 && self.particles.length < 300; i++) {
+          const a = Math.atan2(dy2, dx2) + (Math.random() - .5) * 1.1;
+          const sp = 130 + Math.random() * 130;
+          self.particles.push({ x, y: y - 14, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp * .5 - 30, t: .13, c: c || '#fff2d8', s: 2.6 });
+        }
+      },
       lightning(x0w, y0w, x1w, y1w) { const [x0, y0] = P(x0w, y0w); const [x1, y1] = P(x1w, y1w); const n = 7; for (let i = 0; i <= n && self.particles.length < 298; i++) { const t = i / n; self.particles.push({ x: lerp(x0, x1, t) + (Math.random() - .5) * 14, y: lerp(y0, y1, t) + (Math.random() - .5) * 14, vx: 0, vy: 0, t: .15, c: '#c9b3ff', s: 3.5 }); } },
       dashTrail(x0w, y0w, x1w, y1w) { const [x0, y0] = P(x0w, y0w); const [x1, y1] = P(x1w, y1w); const n = 9; for (let i = 0; i <= n && self.particles.length < 298; i++) { const t = i / n; self.particles.push({ x: lerp(x0, x1, t), y: lerp(y0, y1, t), vx: 0, vy: 0, t: .25, c: '#9fb4c7', s: 4 }); } },
       buff(xw, yw) { this.burst(xw, yw, 14, '#ffd75e'); },
-      levelUp(xw, yw) { this.burst(xw, yw, 40, '#ffd75e'); self.cam.shake = Math.max(self.cam.shake, 6); self.flashes.push({ t: .4, c: '255,215,94' }); },
+      levelUp(xw, yw) {
+        this.burst(xw, yw, 40, '#ffd75e');
+        self.cam.shake = Math.max(self.cam.shake, 6);
+        self.flashes.push({ t: .4, c: '255,215,94' });
+        self.pillars.push({ x: xw, y: yw, t: 1.1 }); // золотой столб света
+      },
       shake(v) { self.cam.shake = Math.max(self.cam.shake, v); },
     };
   }

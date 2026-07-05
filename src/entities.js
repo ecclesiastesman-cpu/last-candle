@@ -45,6 +45,7 @@ export function damageMob(g, m, raw, opts = {}) {
     const kdx = m.x - g.hero.x, kdy = m.y - g.hero.y, kd = Math.hypot(kdx, kdy) || 1;
     const imp = (opts.crit ? 240 : 130) * (m.elite ? .35 : 1);
     m.kvx = (m.kvx || 0) + kdx / kd * imp; m.kvy = (m.kvy || 0) + kdy / kd * imp;
+    g.fx.impact?.(m.x, m.y, kdx, kdy, opts.crit ? '#ffd75e' : undefined);
   }
   // хит-стоп с троттлингом: АоЕ-криты по толпе не складываются в постоянный фриз
   if (opts.crit && (!g._hsT || g.time - g._hsT > .35)) {
@@ -75,7 +76,9 @@ export function killMob(g, m) {
     if (m.boss || m.elite) try { navigator.vibrate?.(35); } catch {}
   }
   g.fx.burst(m.x, m.y, m.elite ? 22 : 12, '#8b0f23');
-  if (m.flare && g.corpses) g.corpses.push({ flare: m.flare, x: m.x, y: m.y, angle: m.angle, r: m.r, fscale: m.fscale, tint: m.tint, t: 0 });
+  if (m.flare && g.corpses) g.corpses.push({ flare: m.flare, x: m.x, y: m.y, angle: m.angle, r: m.r, fscale: m.fscale, tint: m.tint, t: 0,
+    vx: (m.kvx || 0) * .9, vy: (m.kvy || 0) * .9 });
+  if (m.tint) g.fx.burst(m.x, m.y - 10, 6, m.tint);
   if (m.type === 'ally') return;
   // опыт
   gainXp(g, m.xp);

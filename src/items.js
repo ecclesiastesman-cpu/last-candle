@@ -167,6 +167,8 @@ export function computeStats(hero, CLASSES, SKILLS) {
   s.cdr = Math.min(s.cdr, .4); // кап перезарядки — иначе баффы становятся перманентными
   for (const r of ['resFire', 'resCold', 'resLight', 'resPoison']) s[r] = Math.min(75, s[r] + (s.resAll || 0));
   s.lightRadius = 320 * (1 + s.lightR);
+  // «Сила героя» — сводный боевой рейтинг, как в DI
+  s.power = Math.round(s.dmgTotal * 2 + s.maxHp / 3 + s.armor * 1.5 + s.critCh * 3 + s.attackSpeed * 40);
   return s;
 }
 export const armorReduction = (armor, attackerLvl) => Math.min(.8, armor / (armor + 45 + 9 * attackerLvl));
