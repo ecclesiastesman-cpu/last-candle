@@ -1,0 +1,67 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+<defs>
+  <linearGradient id="gold" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#f0d48c"/><stop offset=".35" stop-color="#b08c42"/>
+    <stop offset=".7" stop-color="#6a4e1c"/><stop offset="1" stop-color="#2e2008"/>
+  </linearGradient>
+  <radialGradient id="ringFace" cx=".38" cy=".3" r="1">
+    <stop offset="0" stop-color="#6f5426"/><stop offset=".55" stop-color="#332408"/>
+    <stop offset=".85" stop-color="#241a08"/><stop offset="1" stop-color="#100b03"/>
+  </radialGradient>
+  <radialGradient id="plate" cx=".42" cy=".34" r="1">
+    <stop offset="0" stop-color="#3c2f16"/><stop offset=".6" stop-color="#1c1408"/><stop offset="1" stop-color="#0a0703"/>
+  </radialGradient>
+  <radialGradient id="amber" cx=".38" cy=".3" r="1">
+    <stop offset="0" stop-color="#ffe9b0"/><stop offset=".4" stop-color="#ff9d3c"/>
+    <stop offset=".8" stop-color="#a33c08"/><stop offset="1" stop-color="#521a02"/>
+  </radialGradient>
+  <filter id="emboss" x="-20%" y="-20%" width="140%" height="140%">
+    <feGaussianBlur in="SourceAlpha" stdDeviation="2" result="b"/>
+    <feSpecularLighting in="b" surfaceScale="3" specularConstant=".30" specularExponent="13" lighting-color="#ffe9c0" result="s">
+      <fePointLight x="180" y="120" z="220"/>
+    </feSpecularLighting>
+    <feComposite in="s" in2="SourceAlpha" operator="in" result="s2"/>
+    <feComposite in="SourceGraphic" in2="s2" operator="arithmetic" k1="0" k2="1" k3=".55" k4="0"/>
+  </filter>
+  <filter id="wear" x="-10%" y="-10%" width="120%" height="120%">
+    <feTurbulence type="fractalNoise" baseFrequency=".6" numOctaves="3" seed="12" result="n"/>
+    <feColorMatrix in="n" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  .9 .9 .9 0 -1.06" result="spots"/>
+    <feComposite in="spots" in2="SourceAlpha" operator="in" result="dark"/>
+    <feFlood flood-color="#170f05" flood-opacity=".62" result="dk"/>
+    <feComposite in="dk" in2="dark" operator="in" result="wl"/>
+    <feMerge><feMergeNode in="SourceGraphic"/><feMergeNode in="wl"/></feMerge>
+  </filter>
+</defs>
+<ellipse cx="256" cy="280" rx="240" ry="226" fill="rgba(0,0,0,.4)"/>
+<g filter="url(#wear)">
+  <g filter="url(#emboss)">
+    <!-- утопленная площадка под палец -->
+    <circle cx="256" cy="256" r="206" fill="url(#plate)" fill-opacity=".85"/>
+    <!-- тяжёлый кованый обод -->
+    <circle cx="256" cy="256" r="220" fill="none" stroke="url(#ringFace)" stroke-width="44"/>
+    <circle cx="256" cy="256" r="244" fill="none" stroke="url(#gold)" stroke-width="8"/>
+    <circle cx="256" cy="256" r="250" fill="none" stroke="#ffe8bc" stroke-opacity=".28" stroke-width="2"/>
+    <circle cx="256" cy="256" r="197" fill="none" stroke="#0a0703" stroke-width="8"/>
+    <circle cx="256" cy="256" r="192" fill="none" stroke="url(#gold)" stroke-width="4" stroke-opacity=".8"/>
+    <!-- рунические засечки по ободу (12) -->
+    <g stroke="url(#gold)" stroke-width="7" stroke-linecap="round" fill="none">
+      <g id="rn"><path d="M256 16 l-9 22 M256 16 l9 22 M256 16 v30"/></g>
+      <use href="#rn" transform="rotate(30 256 256)"/><use href="#rn" transform="rotate(60 256 256)"/>
+      <use href="#rn" transform="rotate(90 256 256)"/><use href="#rn" transform="rotate(120 256 256)"/>
+      <use href="#rn" transform="rotate(150 256 256)"/><use href="#rn" transform="rotate(180 256 256)"/>
+      <use href="#rn" transform="rotate(210 256 256)"/><use href="#rn" transform="rotate(240 256 256)"/>
+      <use href="#rn" transform="rotate(270 256 256)"/><use href="#rn" transform="rotate(300 256 256)"/>
+      <use href="#rn" transform="rotate(330 256 256)"/>
+    </g>
+    <!-- четыре янтарных кабошона по диагоналям в оправах -->
+    <g id="gm">
+      <circle cx="404" cy="108" r="19" fill="url(#gold)" stroke="#140c02" stroke-width="4"/>
+      <circle cx="404" cy="108" r="12" fill="url(#amber)" stroke="#2c1404" stroke-width="2.5"/>
+      <ellipse cx="400" cy="103" rx="3.6" ry="4.6" fill="#fff3d0" opacity=".85"/>
+    </g>
+    <use href="#gm" transform="rotate(90 256 256)"/>
+    <use href="#gm" transform="rotate(180 256 256)"/>
+    <use href="#gm" transform="rotate(270 256 256)"/>
+  </g>
+</g>
+</svg>

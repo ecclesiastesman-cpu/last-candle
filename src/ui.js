@@ -180,9 +180,10 @@ export class UI {
       ctx.strokeStyle = `rgba(230,60,60,${.4 + Math.sin(timeS * 7) * .3})`;
       ctx.lineWidth = 2.5; ctx.beginPath(); ctx.arc(cx, cy, r + 9, 0, 7); ctx.stroke();
     }
-    // рама
-    const fr = this.orbFrame(r);
-    ctx.drawImage(fr, cx - fr.width / 2, cy - fr.height / 2);
+    // рама: авторская кованая (SVG-кит) либо процедурный фолбэк
+    const ofr = this.uiImg('orbframe');
+    if (ofr) { const S = r * 2.86; ctx.drawImage(ofr, cx - S / 2, cy - S / 2, S, S); }
+    else { const fr = this.orbFrame(r); ctx.drawImage(fr, cx - fr.width / 2, cy - fr.height / 2); }
     ctx.fillStyle = '#efe6d0'; ctx.font = `bold ${Math.round(r * .38)}px Georgia, serif`; ctx.textAlign = 'center';
     ctx.strokeStyle = 'rgba(0,0,0,0.8)'; ctx.lineWidth = 3;
     ctx.strokeText(label, cx, cy + r * .13);
@@ -478,9 +479,10 @@ export class UI {
       const aR = 46;
       const asx = asHome[0], asy = asHome[1];
       const aimOn = input.aim.active;
-      const ab = this.stickBase(aR, true);
-      ctx.globalAlpha = aimOn ? .95 : .5;
-      ctx.drawImage(ab, asx - ab.width / 2, asy - ab.height / 2);
+      ctx.globalAlpha = aimOn ? .95 : .55;
+      const arImg = this.uiImg('attackring');
+      if (arImg) { const S = aR * 2 * 256 / 206; ctx.drawImage(arImg, asx - S / 2, asy - S / 2, S, S); }
+      else { const ab = this.stickBase(aR, true); ctx.drawImage(ab, asx - ab.width / 2, asy - ab.height / 2); }
       ctx.globalAlpha = 1;
       let adx = 0, ady = 0;
       if (aimOn) {
@@ -529,7 +531,9 @@ export class UI {
         input.addButton('sk' + (i + 1), pos.x, pos.y, 28, 'skill' + (i + 1));
         const usable = canUse(g, id);
         ctx.globalAlpha = usable ? 1 : .38;
-        ctx.drawImage(sock, pos.x - sock.width / 2, pos.y - sock.height / 2);
+        const sockImg = this.uiImg('socket');
+        if (sockImg) { const S = 27 * 2.5; ctx.drawImage(sockImg, pos.x - S / 2, pos.y - S / 2, S, S); }
+        else ctx.drawImage(sock, pos.x - sock.width / 2, pos.y - sock.height / 2);
         ctx.strokeStyle = '#d9cba3'; ctx.fillStyle = '#d9cba3';
         this.drawSkillGlyph(ctx, { id }, pos.x, pos.y, 14);
         const cd = g.hero.cooldowns[id];
@@ -751,23 +755,29 @@ export class UI {
     ctx.fillStyle = '#e8dcc0';
     ctx.beginPath(); ctx.arc(mx + g.hero.x / 64 * cell, my + g.hero.y / 64 * cell, 2.2, 0, 7); ctx.fill();
     ctx.restore(); // конец клипа линзы
-    // золотое компасное кольцо с насечками и меткой севера
-    const ring = ctx.createLinearGradient(cx, cy - R, cx, cy + R);
-    ring.addColorStop(0, '#b8934a'); ring.addColorStop(.5, '#6a5016'); ring.addColorStop(1, '#3a2a0c');
-    ctx.strokeStyle = ring; ctx.lineWidth = 3;
-    ctx.beginPath(); ctx.arc(cx, cy, R, 0, 7); ctx.stroke();
-    ctx.strokeStyle = 'rgba(255,225,150,0.25)'; ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.arc(cx, cy, R + 2, 0, 7); ctx.stroke();
-    ctx.strokeStyle = 'rgba(216,178,90,0.7)'; ctx.lineWidth = 1.6;
-    for (let i = 0; i < 8; i++) {
-      const a = i * Math.PI / 4;
-      ctx.beginPath();
-      ctx.moveTo(cx + Math.cos(a) * (R - 3), cy + Math.sin(a) * (R - 3));
-      ctx.lineTo(cx + Math.cos(a) * (R + 1), cy + Math.sin(a) * (R + 1));
-      ctx.stroke();
+    // компасное кольцо: авторская кованая рама (SVG-кит) либо процедурный фолбэк
+    const cim = this.uiImg('compass');
+    if (cim) {
+      const S = R * 2 * 256 / 203;
+      ctx.drawImage(cim, cx - S / 2, cy - S / 2, S, S);
+    } else {
+      const ring = ctx.createLinearGradient(cx, cy - R, cx, cy + R);
+      ring.addColorStop(0, '#b8934a'); ring.addColorStop(.5, '#6a5016'); ring.addColorStop(1, '#3a2a0c');
+      ctx.strokeStyle = ring; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(cx, cy, R, 0, 7); ctx.stroke();
+      ctx.strokeStyle = 'rgba(255,225,150,0.25)'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.arc(cx, cy, R + 2, 0, 7); ctx.stroke();
+      ctx.strokeStyle = 'rgba(216,178,90,0.7)'; ctx.lineWidth = 1.6;
+      for (let i = 0; i < 8; i++) {
+        const a = i * Math.PI / 4;
+        ctx.beginPath();
+        ctx.moveTo(cx + Math.cos(a) * (R - 3), cy + Math.sin(a) * (R - 3));
+        ctx.lineTo(cx + Math.cos(a) * (R + 1), cy + Math.sin(a) * (R + 1));
+        ctx.stroke();
+      }
     }
     ctx.fillStyle = '#ffd75e'; ctx.font = 'bold 9px Georgia'; ctx.textAlign = 'center';
-    ctx.fillText('С', cx, cy - R + 10);
+    ctx.fillText('С', cx, cy - R + 12);
     // имя зоны под линзой (DI-стиль)
     const zone = g.townMode ? STR.town : g.progress.rift ? `${STR.rift} ${g.progress.riftLvl}`
       : g.floor?.zoneName ? g.floor.zoneName : `${STR.acts[g.progress.act].name} · ${STR.floor} ${g.progress.floor}`;

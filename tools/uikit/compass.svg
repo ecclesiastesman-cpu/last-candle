@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+<defs>
+  <linearGradient id="gold" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#f0d48c"/><stop offset=".35" stop-color="#b08c42"/>
+    <stop offset=".7" stop-color="#6a4e1c"/><stop offset="1" stop-color="#2e2008"/>
+  </linearGradient>
+  <radialGradient id="ringFace" cx=".38" cy=".3" r="1">
+    <stop offset="0" stop-color="#6f5426"/><stop offset=".55" stop-color="#332408"/>
+    <stop offset=".85" stop-color="#241a08"/><stop offset="1" stop-color="#100b03"/>
+  </radialGradient>
+  <radialGradient id="ruby" cx=".38" cy=".3" r="1">
+    <stop offset="0" stop-color="#ffc9b8"/><stop offset=".4" stop-color="#e04836"/>
+    <stop offset=".8" stop-color="#7a1208"/><stop offset="1" stop-color="#3a0602"/>
+  </radialGradient>
+  <filter id="emboss" x="-20%" y="-20%" width="140%" height="140%">
+    <feGaussianBlur in="SourceAlpha" stdDeviation="2" result="b"/>
+    <feSpecularLighting in="b" surfaceScale="3" specularConstant=".30" specularExponent="13" lighting-color="#ffe9c0" result="s">
+      <fePointLight x="180" y="120" z="220"/>
+    </feSpecularLighting>
+    <feComposite in="s" in2="SourceAlpha" operator="in" result="s2"/>
+    <feComposite in="SourceGraphic" in2="s2" operator="arithmetic" k1="0" k2="1" k3=".55" k4="0"/>
+  </filter>
+  <filter id="wear" x="-10%" y="-10%" width="120%" height="120%">
+    <feTurbulence type="fractalNoise" baseFrequency=".55" numOctaves="3" seed="21" result="n"/>
+    <feColorMatrix in="n" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  .9 .9 .9 0 -1.06" result="spots"/>
+    <feComposite in="spots" in2="SourceAlpha" operator="in" result="dark"/>
+    <feFlood flood-color="#170f05" flood-opacity=".62" result="dk"/>
+    <feComposite in="dk" in2="dark" operator="in" result="wl"/>
+    <feMerge><feMergeNode in="SourceGraphic"/><feMergeNode in="wl"/></feMerge>
+  </filter>
+</defs>
+<g filter="url(#wear)">
+  <g filter="url(#emboss)">
+    <!-- кованое кольцо линзы -->
+    <circle cx="256" cy="256" r="226" fill="none" stroke="url(#ringFace)" stroke-width="34"/>
+    <circle cx="256" cy="256" r="245" fill="none" stroke="url(#gold)" stroke-width="7"/>
+    <circle cx="256" cy="256" r="251" fill="none" stroke="#ffe8bc" stroke-opacity=".25" stroke-width="2"/>
+    <circle cx="256" cy="256" r="208" fill="none" stroke="#0a0703" stroke-width="7"/>
+    <circle cx="256" cy="256" r="203" fill="none" stroke="url(#gold)" stroke-width="3.6" stroke-opacity=".8"/>
+    <!-- 8 стрелок-румбов -->
+    <g fill="url(#gold)" stroke="#140c02" stroke-width="3">
+      <g id="tick"><path d="M256 8 L268 44 L256 36 L244 44 Z"/></g>
+      <use href="#tick" transform="rotate(45 256 256)"/><use href="#tick" transform="rotate(90 256 256)"/>
+      <use href="#tick" transform="rotate(135 256 256)"/><use href="#tick" transform="rotate(180 256 256)"/>
+      <use href="#tick" transform="rotate(225 256 256)"/><use href="#tick" transform="rotate(270 256 256)"/>
+      <use href="#tick" transform="rotate(315 256 256)"/>
+    </g>
+    <!-- малые засечки (16) -->
+    <g stroke="url(#gold)" stroke-width="4" stroke-linecap="round">
+      <g id="st"><path d="M256 20v16" transform="rotate(22.5 256 256)"/></g>
+      <use href="#st" transform="rotate(45 256 256)"/><use href="#st" transform="rotate(90 256 256)"/>
+      <use href="#st" transform="rotate(135 256 256)"/><use href="#st" transform="rotate(180 256 256)"/>
+      <use href="#st" transform="rotate(225 256 256)"/><use href="#st" transform="rotate(270 256 256)"/>
+      <use href="#st" transform="rotate(315 256 256)"/>
+    </g>
+    <!-- северное навершие с рубином -->
+    <path d="M256 0 C272 16 280 34 272 52 L240 52 C232 34 240 16 256 0 Z" fill="url(#gold)" stroke="#140c02" stroke-width="4"/>
+    <circle cx="256" cy="38" r="12" fill="url(#ruby)" stroke="#2c0804" stroke-width="3"/>
+    <ellipse cx="251.5" cy="33" rx="3.6" ry="4.6" fill="#ffd9c8" opacity=".85"/>
+  </g>
+</g>
+</svg>
