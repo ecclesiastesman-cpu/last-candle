@@ -664,18 +664,43 @@ export class UI {
     }
     // миникарта
     this.drawMinimap(ctx, g, W, land);
-    // босс-бар
+    // босс-бар: рисованная рама Flare с коваными концами (фолбэк — старые прямоугольники)
     const boss = g.mobs.find(m => m.boss && !m.dead && m.aggro);
     if (boss) {
-      ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(W * .18, 54, W * .64, 14);
-      ctx.strokeStyle = 'rgba(140,109,31,0.7)'; ctx.lineWidth = 1.5; ctx.strokeRect(W * .18, 54, W * .64, 14);
-      const bg2 = ctx.createLinearGradient(0, 54, 0, 68);
-      bg2.addColorStop(0, '#b81f36'); bg2.addColorStop(1, '#5e0a14');
-      ctx.fillStyle = bg2;
-      ctx.fillRect(W * .18 + 2, 56, (W * .64 - 4) * clamp(boss.hp / boss.maxHp, 0, 1), 10);
+      const frac = clamp(boss.hp / boss.maxHp, 0, 1);
+      const bw = W * .58, bx = W / 2 - bw / 2;
+      const bbg = this.uiImg('barbg'), bfl = this.uiImg('barfill');
+      if (bbg && bfl) {
+        const sx = bw / bbg.width;
+        ctx.drawImage(bbg, bx, 52, bw, 26);
+        if (frac > .01) ctx.drawImage(bfl, 0, 0, Math.max(1, bfl.width * frac), bfl.height,
+          bx + 14 * sx, 55, (bw - 30 * sx) * frac, 19);
+      } else {
+        ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(bx, 54, bw, 14);
+        ctx.strokeStyle = 'rgba(140,109,31,0.7)'; ctx.lineWidth = 1.5; ctx.strokeRect(bx, 54, bw, 14);
+        const bg2 = ctx.createLinearGradient(0, 54, 0, 68);
+        bg2.addColorStop(0, '#b81f36'); bg2.addColorStop(1, '#5e0a14');
+        ctx.fillStyle = bg2;
+        ctx.fillRect(bx + 2, 56, (bw - 4) * frac, 10);
+      }
       ctx.fillStyle = '#e8dcc0'; ctx.textAlign = 'center'; ctx.font = 'bold 13px Georgia';
-      ctx.fillText(STR.mobNames[boss.kind] || '', W / 2, 50);
+      ctx.strokeStyle = 'rgba(0,0,0,0.85)'; ctx.lineWidth = 3;
+      const bn = STR.mobNames[boss.kind] || '';
+      ctx.strokeText(bn, W / 2, 48);
+      ctx.fillText(bn, W / 2, 48);
     }
+  }
+  // картинки UI-кита (assets/ui): ленивый кэш, как skillIcon
+  uiImg(name) {
+    this._uiImgs = this._uiImgs || new Map();
+    let e = this._uiImgs.get(name);
+    if (!e) {
+      e = { img: new Image(), ready: false };
+      e.img.onload = () => { e.ready = true; };
+      e.img.src = './assets/ui/' + name + '.webp';
+      this._uiImgs.set(name, e);
+    }
+    return e.ready ? e.img : null;
   }
   drawMinimap(ctx, g, W, land) {
     const f = g.floor;

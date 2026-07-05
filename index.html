@@ -33,9 +33,10 @@ canvas{display:block;position:fixed;inset:0}
   background:
     radial-gradient(ellipse at 50% -5%, rgba(70,52,22,.18), transparent 55%),
     radial-gradient(ellipse at 50% 108%, rgba(40,26,10,.25), transparent 55%),
-    repeating-linear-gradient(45deg, rgba(255,255,255,.011) 0 2px, transparent 2px 4px),
     repeating-linear-gradient(-45deg, rgba(0,0,0,.12) 0 1px, transparent 1px 5px),
+    url('./assets/ui/leather.webp') repeat,
     linear-gradient(#0c0a06, #060503)}
+.panel{background-size:auto,auto,auto,256px 144px,auto}
 .panel::after{content:'';position:fixed;inset:4px;pointer-events:none;z-index:5;
   border:14px solid transparent;
   border-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='96' height='96'><g fill='none' stroke='%237a5c1e' stroke-width='1.6'><path d='M4 34 V12 Q4 4 12 4 H34'/><path d='M8 34 V14 Q8 8 14 8 H34' stroke='%23443311' stroke-width='1'/><path d='M62 4 H84 Q92 4 92 12 V34'/><path d='M62 8 H82 Q88 8 88 14 V34' stroke='%23443311' stroke-width='1'/><path d='M4 62 V84 Q4 92 12 92 H34'/><path d='M8 62 V82 Q8 88 14 88 H34' stroke='%23443311' stroke-width='1'/><path d='M92 62 V84 Q92 92 84 92 H62'/><path d='M88 62 V82 Q88 88 82 88 H62' stroke='%23443311' stroke-width='1'/><path d='M34 4 H62 M34 92 H62 M4 34 V62 M92 34 V62' stroke='%23443311' stroke-width='1'/></g><g fill='%238c6d1f'><path d='M12 12 l5 -2 -2 5 z'/><path d='M84 12 l2 5 -5 -2 z'/><path d='M12 84 l-2 -5 5 2 z'/><path d='M84 84 l-5 2 2 -5 z'/><circle cx='48' cy='4' r='2'/><circle cx='48' cy='92' r='2'/><circle cx='4' cy='48' r='2'/><circle cx='92' cy='48' r='2'/></g></svg>") 32 repeat}
@@ -75,6 +76,7 @@ canvas{display:block;position:fixed;inset:0}
 .cell{width:54px;height:54px;position:relative;
   background:
     radial-gradient(ellipse at 50% 26%, rgba(96,80,52,.16), transparent 65%),
+    url('./assets/ui/slot.webp') center/cover,
     linear-gradient(160deg,#1b150b,#0a0705 70%);
   border:1px solid #000;
   clip-path:polygon(5px 0,calc(100% - 5px) 0,100% 5px,100% calc(100% - 5px),calc(100% - 5px) 100%,5px 100%,0 calc(100% - 5px),0 5px);

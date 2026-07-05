@@ -1,5 +1,5 @@
 // Service Worker: полный прекэш — игра работает без сети после первого открытия.
-const VERSION = 'lastcandle-v17';
+const VERSION = 'lastcandle-v18';
 const CORE = [
   './', './index.html', './manifest.webmanifest',
   './src/main.js', './src/core.js', './src/data.js', './src/strings.js', './src/items.js',
@@ -29,6 +29,7 @@ const FLARE = ['e_skeleton', 'e_skeleton_mage', 'e_zombie', 'e_goblin', 'e_antli
   'f_cloth_shirt', 'f_leather_chest', 'f_chain_cuirass', 'f_plate_cuirass', 'f_mage_vest',
   'f_leather_hood', 'f_chain_coif', 'f_plate_helm', 'f_greatbow',
 ].map(n => './assets/flare/' + n + '.webp');
+const UIKIT = ['leather', 'slot', 'barbg', 'barfill', 'ornL', 'ornR'].map(n => './assets/ui/' + n + '.webp');
 const ASSETS = [
   'hero_barbarian', 'hero_huntress', 'hero_mage', 'hero_warlock', 'hero_druid', 'form_wolf', 'form_bear',
   'mob_skeleton', 'mob_zombie', 'mob_ghoul', 'mob_bloater', 'mob_cultist', 'mob_hound', 'mob_imp', 'mob_knight',
@@ -45,7 +46,7 @@ self.addEventListener('install', e => {
     const cache = await caches.open(VERSION);
     // ядро обязано закэшироваться; ассеты — сколько получится (отсутствующие не валят установку)
     await cache.addAll(CORE);
-    await Promise.allSettled([...ASSETS, ...FLARE, ...LOOT, ...SKILLICONS].map(u => cache.add(u)));
+    await Promise.allSettled([...ASSETS, ...FLARE, ...LOOT, ...SKILLICONS, ...UIKIT].map(u => cache.add(u)));
     self.skipWaiting();
   })());
 });
