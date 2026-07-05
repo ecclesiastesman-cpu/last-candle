@@ -413,12 +413,13 @@ export class UI {
     ctx.font = '13px Georgia, serif';
     const orbR = land ? 40 : touch ? 37 : 42;
     let hpPos, mpPos, lsHome, asHome, potPos;
-    if (land && touch) {
+    const diOrbs = land && touch; // DI-схема: один орб HP в правом кластере, ресурс — кольцо вокруг атаки
+    if (diOrbs) {
       lsHome = [SL + 112, H - 102];
       asHome = [W - SL - 112, H - 102];
-      hpPos = [SL + 264, H - orbR - 14];
-      mpPos = [W - SL - 264, H - orbR - 14];
-      potPos = [W - SL - 194, H - 42]; // в правом кластере — достаёт большой палец
+      hpPos = [W - SL - 272, H - orbR - 14]; // слева от веера скиллов — как в DI
+      mpPos = null;
+      potPos = [W - SL - 206, H - 40]; // фляга под орбом HP
     } else {
       lsHome = [96, H - 148 - safeB];
       asHome = [W - 96, H - 148 - safeB];
@@ -433,7 +434,7 @@ export class UI {
     }[g.cls.resource];
     this.drawOrb(ctx, hpPos[0], hpPos[1], orbR, clamp(h.hp / s.maxHp, 0, 1),
       '#e0402e', '#5e0a0a', Math.ceil(h.hp), timeS, h.hp < s.maxHp * .3);
-    this.drawOrb(ctx, mpPos[0], mpPos[1], orbR, clamp(h.res / s.maxRes, 0, 1),
+    if (mpPos) this.drawOrb(ctx, mpPos[0], mpPos[1], orbR, clamp(h.res / s.maxRes, 0, 1),
       resCol[0], resCol[1], Math.ceil(h.res), timeS, false);
     // XP: золочёный жёлоб с насечками (шире, как нижняя кромка DI)
     const xw = W * (land ? .40 : .44), xx = W / 2 - xw / 2, xy = H - 12; // зазор под home-индикатор iPhone
@@ -493,6 +494,30 @@ export class UI {
       ctx.strokeStyle = '#241a06'; ctx.fillStyle = '#241a06';
       this.drawSkillGlyph(ctx, { id: 'attack' }, asx + adx, asy + ady, 14);
       ctx.restore();
+      // ресурс класса — кольцо вокруг кнопки атаки (DI-стиль)
+      if (diOrbs) {
+        const rr = aR + 11, frac = clamp(h.res / s.maxRes, 0, 1);
+        const a0 = Math.PI * .5 + .35, a1 = Math.PI * .5 - .35 + Math.PI * 2; // разрыв внизу, под пальцем
+        ctx.save();
+        ctx.lineCap = 'round';
+        ctx.strokeStyle = 'rgba(8,6,3,0.78)'; ctx.lineWidth = 7;
+        ctx.beginPath(); ctx.arc(asx, asy, rr, a0, a1); ctx.stroke();
+        if (frac > .005) {
+          const ae = a0 + (a1 - a0) * frac;
+          const rg = ctx.createLinearGradient(asx, asy + rr, asx, asy - rr);
+          rg.addColorStop(0, resCol[1]); rg.addColorStop(1, resCol[0]);
+          ctx.strokeStyle = rg; ctx.lineWidth = 4.6;
+          ctx.beginPath(); ctx.arc(asx, asy, rr, a0, ae); ctx.stroke();
+          // светящийся кончик шкалы
+          ctx.fillStyle = resCol[0]; ctx.globalAlpha = .9;
+          ctx.beginPath(); ctx.arc(asx + Math.cos(ae) * rr, asy + Math.sin(ae) * rr, 3, 0, 7); ctx.fill();
+          ctx.globalAlpha = 1;
+        }
+        // тонкий золотой кант поверх жёлоба
+        ctx.strokeStyle = 'rgba(184,147,74,0.5)'; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.arc(asx, asy, rr + 4, a0, a1); ctx.stroke();
+        ctx.restore();
+      }
       // скиллы дугой над прицельным стиком
       const bar = g.hero.skillBar;
       const sock = this.skillSocket(27);
