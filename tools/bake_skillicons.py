@@ -2,7 +2,7 @@
 """Иконки умений из game-icons.net (CC-BY 3.0, авторы Lorc и Delapouite).
 SVG -> золото на прозрачном -> assets/skills/<skill_id>.webp (64px).
 Кандидаты перечислены по приоритету; берётся первый существующий."""
-import os, io
+import os, io, re
 import cairosvg
 from PIL import Image
 
@@ -59,8 +59,27 @@ if __name__ == '__main__':
             if path: break
         if not path: missing.append((sid, cands)); continue
         svg = open(path).read()
+        svg = re.sub(r'<path d="M0 0h512v512H0z"\s*/?>(</path>)?', '', svg)
         svg = svg.replace('fill="#000"', 'fill="none"').replace('fill="#000000"', 'fill="none"')
-        svg = svg.replace('fill="#fff"', f'fill="{GOLD}"').replace('fill="#ffffff"', f'fill="{GOLD}"')
-        png = cairosvg.svg2png(bytestring=svg.encode(), output_width=64, output_height=64)
-        Image.open(io.BytesIO(png)).convert('RGBA').save(os.path.join(OUT, sid + '.webp'), 'WEBP', quality=90)
+        svg = svg.replace('fill="#fff"', 'fill="#ffffff"')
+        png = cairosvg.svg2png(bytestring=svg.encode(), output_width=128, output_height=128)
+        im = Image.open(io.BytesIO(png)).convert('RGBA')
+        a = im.getchannel('A')
+        # вертикальный золотой градиент по маске глифа
+        grad = Image.linear_gradient('L').resize((128, 128))  # 0 сверху -> 255 снизу
+        top = Image.new('RGBA', (128, 128), (246, 224, 160, 255))
+        bot = Image.new('RGBA', (128, 128), (128, 94, 40, 255))
+        fill = Image.composite(bot, top, grad)
+        glyph = Image.new('RGBA', (128, 128), (0, 0, 0, 0))
+        glyph.paste(fill, (0, 0), a)
+        # чеканка: тёмная тень вниз-вправо, тёплый блик вверх-влево
+        from PIL import ImageChops
+        amask = a.point(lambda v: v)
+        sh = Image.new('RGBA', (128, 128), (0, 0, 0, 0)); sh.paste((24, 14, 4, 210), (0, 0), amask)
+        hl = Image.new('RGBA', (128, 128), (0, 0, 0, 0)); hl.paste((255, 243, 205, 130), (0, 0), amask)
+        out = Image.new('RGBA', (128, 128), (0, 0, 0, 0))
+        out.alpha_composite(ImageChops.offset(sh, 2, 3))
+        out.alpha_composite(ImageChops.offset(hl, -1, -2))
+        out.alpha_composite(glyph)
+        out.save(os.path.join(OUT, sid + '.webp'), 'WEBP', quality=90)
     print('baked', len(MAP) - len(missing), 'missing:', missing)

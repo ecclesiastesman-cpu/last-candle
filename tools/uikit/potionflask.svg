@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+<defs>
+  <linearGradient id="gold" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#eecf86"/><stop offset=".45" stop-color="#a8823c"/><stop offset="1" stop-color="#3a2a0c"/>
+  </linearGradient>
+  <linearGradient id="liquid" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#f05a48"/><stop offset=".5" stop-color="#c11f28"/><stop offset="1" stop-color="#5e0a0e"/>
+  </linearGradient>
+  <radialGradient id="glass" cx=".35" cy=".3" r="1">
+    <stop offset="0" stop-color="#4a3a38" stop-opacity=".55"/><stop offset="1" stop-color="#140e0c" stop-opacity=".8"/>
+  </radialGradient>
+  <linearGradient id="cork" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#b08a62"/><stop offset="1" stop-color="#4e382c"/>
+  </linearGradient>
+  <filter id="emboss" x="-20%" y="-20%" width="140%" height="140%">
+    <feGaussianBlur in="SourceAlpha" stdDeviation="1.4" result="b"/>
+    <feSpecularLighting in="b" surfaceScale="2.4" specularConstant=".32" specularExponent="12" lighting-color="#ffe9c0" result="s">
+      <fePointLight x="90" y="60" z="130"/>
+    </feSpecularLighting>
+    <feComposite in="s" in2="SourceAlpha" operator="in" result="s2"/>
+    <feComposite in="SourceGraphic" in2="s2" operator="arithmetic" k1="0" k2="1" k3=".55" k4="0"/>
+  </filter>
+</defs>
+<ellipse cx="128" cy="228" rx="74" ry="18" fill="rgba(0,0,0,.45)"/>
+<g filter="url(#emboss)">
+  <!-- пробка -->
+  <path d="M112 22 h32 v30 h-32 z" fill="url(#cork)" stroke="#241505" stroke-width="4" rx="6"/>
+  <!-- горлышко -->
+  <path d="M106 50 h44 v22 h-44 z" fill="url(#glass)" stroke="#2a1c14" stroke-width="4"/>
+  <!-- золотая обойма горлышка -->
+  <rect x="100" y="66" width="56" height="16" rx="6" fill="url(#gold)" stroke="#1c1204" stroke-width="3.4"/>
+  <!-- колба -->
+  <path d="M108 82 C74 108 62 140 62 168 C62 208 92 232 128 232 C164 232 194 208 194 168 C194 140 182 108 148 82 Z"
+    fill="url(#glass)" stroke="#2a1c14" stroke-width="5"/>
+  <!-- жидкость -->
+  <path d="M76 150 C72 158 70 164 70 170 C70 202 96 224 128 224 C160 224 186 202 186 170 C186 164 184 158 180 150
+    C168 162 148 168 128 168 C108 168 88 162 76 150 Z" fill="url(#liquid)"/>
+  <path d="M80 154 C94 164 110 169 128 169 C146 169 162 164 176 154" fill="none" stroke="#ff9d8a" stroke-width="4" opacity=".7"/>
+  <!-- пузырьки -->
+  <circle cx="106" cy="192" r="5" fill="#ff8f7d" opacity=".55"/>
+  <circle cx="142" cy="204" r="3.6" fill="#ff8f7d" opacity=".45"/>
+  <circle cx="126" cy="182" r="2.6" fill="#ffc0b4" opacity=".5"/>
+  <!-- золотая оковка низа -->
+  <path d="M84 214 C96 226 110 232 128 232 C146 232 160 226 172 214 L166 228 C154 236 142 240 128 240 C114 240 102 236 90 228 Z"
+    fill="url(#gold)" stroke="#1c1204" stroke-width="3"/>
+  <!-- стеклянный блик -->
+  <path d="M92 106 C82 124 76 142 78 162" fill="none" stroke="#ffffff" stroke-width="7" stroke-linecap="round" opacity=".3"/>
+</g>
+</svg>

@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+<defs>
+  <radialGradient id="ball" cx=".36" cy=".32" r="1">
+    <stop offset="0" stop-color="#d4d9e4"/><stop offset=".38" stop-color="#868c99"/>
+    <stop offset=".72" stop-color="#464a54"/><stop offset="1" stop-color="#15161a"/>
+  </radialGradient>
+  <linearGradient id="rim" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#aeb4c1"/><stop offset="1" stop-color="#2a2c33"/>
+  </linearGradient>
+  <filter id="wear" x="-10%" y="-10%" width="120%" height="120%">
+    <feTurbulence type="fractalNoise" baseFrequency=".9" numOctaves="2" seed="8" result="n"/>
+    <feColorMatrix in="n" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  .9 .9 .9 0 -1.1" result="spots"/>
+    <feComposite in="spots" in2="SourceAlpha" operator="in" result="dark"/>
+    <feFlood flood-color="#0b0c0f" flood-opacity=".5" result="dk"/>
+    <feComposite in="dk" in2="dark" operator="in" result="wl"/>
+    <feMerge><feMergeNode in="SourceGraphic"/><feMergeNode in="wl"/></feMerge>
+  </filter>
+</defs>
+<ellipse cx="130" cy="150" rx="98" ry="82" fill="rgba(0,0,0,.4)"/>
+<g filter="url(#wear)">
+  <circle cx="128" cy="124" r="100" fill="url(#ball)"/>
+  <circle cx="128" cy="124" r="100" fill="none" stroke="#0a0b0d" stroke-width="4"/>
+  <!-- врезанное кольцо -->
+  <circle cx="128" cy="124" r="62" fill="none" stroke="#0e0f13" stroke-opacity=".75" stroke-width="5"/>
+  <circle cx="128" cy="124" r="67" fill="none" stroke="url(#rim)" stroke-opacity=".55" stroke-width="2.4"/>
+  <!-- насечка хвата -->
+  <g stroke="#0c0d10" stroke-opacity=".55" stroke-width="4" stroke-linecap="round">
+    <g id="nt"><path d="M128 34 v18"/></g>
+    <use href="#nt" transform="rotate(36 128 124)"/><use href="#nt" transform="rotate(72 128 124)"/>
+    <use href="#nt" transform="rotate(108 128 124)"/><use href="#nt" transform="rotate(144 128 124)"/>
+    <use href="#nt" transform="rotate(180 128 124)"/><use href="#nt" transform="rotate(216 128 124)"/>
+    <use href="#nt" transform="rotate(252 128 124)"/><use href="#nt" transform="rotate(288 128 124)"/>
+    <use href="#nt" transform="rotate(324 128 124)"/>
+  </g>
+  <!-- блик -->
+  <ellipse cx="96" cy="80" rx="30" ry="16" fill="#ffffff" opacity=".38" transform="rotate(-28 96 80)"/>
+</g>
+</svg>

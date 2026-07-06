@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+<defs>
+  <linearGradient id="steel" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#b9bec9"/><stop offset=".4" stop-color="#6e737e"/>
+    <stop offset=".75" stop-color="#3a3d46"/><stop offset="1" stop-color="#191b20"/>
+  </linearGradient>
+  <radialGradient id="ringFace" cx=".38" cy=".3" r="1">
+    <stop offset="0" stop-color="#5a5e68"/><stop offset=".55" stop-color="#2e3138"/>
+    <stop offset=".85" stop-color="#1a1c21"/><stop offset="1" stop-color="#0b0c0f"/>
+  </radialGradient>
+  <radialGradient id="plate" cx=".42" cy=".34" r="1">
+    <stop offset="0" stop-color="#2a2c33"/><stop offset=".6" stop-color="#15161b"/><stop offset="1" stop-color="#08090b"/>
+  </radialGradient>
+  <filter id="emboss" x="-20%" y="-20%" width="140%" height="140%">
+    <feGaussianBlur in="SourceAlpha" stdDeviation="2" result="b"/>
+    <feSpecularLighting in="b" surfaceScale="3" specularConstant=".28" specularExponent="13" lighting-color="#dfe6f2" result="s">
+      <fePointLight x="180" y="120" z="220"/>
+    </feSpecularLighting>
+    <feComposite in="s" in2="SourceAlpha" operator="in" result="s2"/>
+    <feComposite in="SourceGraphic" in2="s2" operator="arithmetic" k1="0" k2="1" k3=".5" k4="0"/>
+  </filter>
+  <filter id="wear" x="-10%" y="-10%" width="120%" height="120%">
+    <feTurbulence type="fractalNoise" baseFrequency=".6" numOctaves="3" seed="31" result="n"/>
+    <feColorMatrix in="n" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  .9 .9 .9 0 -1.06" result="spots"/>
+    <feComposite in="spots" in2="SourceAlpha" operator="in" result="dark"/>
+    <feFlood flood-color="#0c0d10" flood-opacity=".6" result="dk"/>
+    <feComposite in="dk" in2="dark" operator="in" result="wl"/>
+    <feMerge><feMergeNode in="SourceGraphic"/><feMergeNode in="wl"/></feMerge>
+  </filter>
+</defs>
+<ellipse cx="256" cy="278" rx="238" ry="226" fill="rgba(0,0,0,.35)"/>
+<g filter="url(#wear)">
+  <g filter="url(#emboss)">
+    <!-- утопленная площадка -->
+    <circle cx="256" cy="256" r="206" fill="url(#plate)" fill-opacity=".8"/>
+    <!-- кованый стальной обод -->
+    <circle cx="256" cy="256" r="220" fill="none" stroke="url(#ringFace)" stroke-width="44"/>
+    <circle cx="256" cy="256" r="244" fill="none" stroke="url(#steel)" stroke-width="7"/>
+    <circle cx="256" cy="256" r="250" fill="none" stroke="#e6ecf8" stroke-opacity=".2" stroke-width="2"/>
+    <circle cx="256" cy="256" r="197" fill="none" stroke="#0a0b0d" stroke-width="8"/>
+    <circle cx="256" cy="256" r="192" fill="none" stroke="url(#steel)" stroke-width="3.6" stroke-opacity=".7"/>
+    <!-- стрелки направлений (4) -->
+    <g fill="url(#steel)" stroke="#0c0d10" stroke-width="3.4">
+      <g id="dir"><path d="M256 178 L274 210 L256 202 L238 210 Z"/></g>
+      <use href="#dir" transform="rotate(90 256 256)"/>
+      <use href="#dir" transform="rotate(180 256 256)"/>
+      <use href="#dir" transform="rotate(270 256 256)"/>
+    </g>
+    <!-- заклёпки по ободу (8) -->
+    <g>
+      <g id="rv"><circle cx="256" cy="34" r="8" fill="url(#steel)" stroke="#0c0d10" stroke-width="2.6"/></g>
+      <use href="#rv" transform="rotate(45 256 256)"/><use href="#rv" transform="rotate(90 256 256)"/>
+      <use href="#rv" transform="rotate(135 256 256)"/><use href="#rv" transform="rotate(180 256 256)"/>
+      <use href="#rv" transform="rotate(225 256 256)"/><use href="#rv" transform="rotate(270 256 256)"/>
+      <use href="#rv" transform="rotate(315 256 256)"/>
+    </g>
+  </g>
+</g>
+</svg>

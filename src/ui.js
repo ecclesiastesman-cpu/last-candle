@@ -241,6 +241,15 @@ export class UI {
   }
   // рукоятка стика: кованый набалдашник с ободом и насечкой
   drawKnob(ctx, x, y, r, gold, alpha) {
+    const kImg = this.uiImg(gold ? 'knobgold' : 'knobsteel');
+    if (kImg) {
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      const S = r * 2 * 256 / 200;
+      ctx.drawImage(kImg, x - S / 2, y - S / 2 - S * .015, S, S);
+      ctx.restore();
+      return;
+    }
     ctx.save();
     ctx.globalAlpha = alpha;
     // тень
@@ -470,9 +479,10 @@ export class UI {
       // левый стик
       const lR = 52;
       const lsx = input.stick.active ? input.stick.ox : lsHome[0], lsy = input.stick.active ? input.stick.oy : lsHome[1];
-      const lb = this.stickBase(lR, false);
-      ctx.globalAlpha = input.stick.active ? .85 : .42;
-      ctx.drawImage(lb, lsx - lb.width / 2, lsy - lb.height / 2);
+      ctx.globalAlpha = input.stick.active ? .85 : .45;
+      const mrImg = this.uiImg('movering');
+      if (mrImg) { const S = lR * 2 * 256 / 206; ctx.drawImage(mrImg, lsx - S / 2, lsy - S / 2, S, S); }
+      else { const lb = this.stickBase(lR, false); ctx.drawImage(lb, lsx - lb.width / 2, lsy - lb.height / 2); }
       ctx.globalAlpha = 1;
       const ldx = input.stick.active ? clamp(input.stick.x - input.stick.ox, -lR, lR) : 0;
       const ldy = input.stick.active ? clamp(input.stick.y - input.stick.oy, -lR, lR) : 0;
@@ -583,17 +593,24 @@ export class UI {
       const hasPot = h.potionCharges > 0;
       ctx.save();
       ctx.globalAlpha = hasPot ? 1 : .45;
-      // колба
-      ctx.fillStyle = '#1a130c';
-      ctx.beginPath(); ctx.roundRect(px - 14, py - 12, 28, 26, 7); ctx.fill();
-      ctx.strokeStyle = '#8c6d1f'; ctx.lineWidth = 2; ctx.stroke();
-      const pf = ctx.createLinearGradient(0, py - 8, 0, py + 12);
-      pf.addColorStop(0, '#e0402e'); pf.addColorStop(1, '#5e0a0a');
-      ctx.fillStyle = hasPot ? pf : '#2a1414';
-      ctx.beginPath(); ctx.roundRect(px - 10, py - 6, 20, 17, 5); ctx.fill();
-      ctx.fillStyle = '#8d6e63'; ctx.fillRect(px - 4, py - 18, 8, 7);
-      ctx.fillStyle = 'rgba(255,255,255,0.25)';
-      ctx.beginPath(); ctx.ellipse(px - 5, py - 2, 3, 5, -.4, 0, 7); ctx.fill();
+      const pfImg = this.uiImg('potionflask');
+      if (pfImg) {
+        const S = 52;
+        if (!hasPot) ctx.globalAlpha = .35;
+        ctx.drawImage(pfImg, px - S / 2, py - S / 2 - 4, S, S);
+      } else {
+        // колба (процедурный фолбэк)
+        ctx.fillStyle = '#1a130c';
+        ctx.beginPath(); ctx.roundRect(px - 14, py - 12, 28, 26, 7); ctx.fill();
+        ctx.strokeStyle = '#8c6d1f'; ctx.lineWidth = 2; ctx.stroke();
+        const pf = ctx.createLinearGradient(0, py - 8, 0, py + 12);
+        pf.addColorStop(0, '#e0402e'); pf.addColorStop(1, '#5e0a0a');
+        ctx.fillStyle = hasPot ? pf : '#2a1414';
+        ctx.beginPath(); ctx.roundRect(px - 10, py - 6, 20, 17, 5); ctx.fill();
+        ctx.fillStyle = '#8d6e63'; ctx.fillRect(px - 4, py - 18, 8, 7);
+        ctx.fillStyle = 'rgba(255,255,255,0.25)';
+        ctx.beginPath(); ctx.ellipse(px - 5, py - 2, 3, 5, -.4, 0, 7); ctx.fill();
+      }
       ctx.restore();
       // счётчик зарядов
       ctx.fillStyle = '#efe6d0'; ctx.font = 'bold 12px Georgia'; ctx.textAlign = 'center';
@@ -604,6 +621,9 @@ export class UI {
     // кнопка городского портала (в подземелье)
     if (!g.townMode) {
       input.addButton('tp', W - 26, 106, 20, 'townportal');
+      const bpImg = this.uiImg('btnportal');
+      if (bpImg) { ctx.drawImage(bpImg, W - 26 - 21, 106 - 21, 42, 42); }
+      else {
       ctx.fillStyle = 'rgba(21,19,16,0.85)'; ctx.beginPath(); ctx.arc(W - 26, 106, 17, 0, 7); ctx.fill();
       ctx.strokeStyle = '#4a7ab8'; ctx.lineWidth = 2; ctx.stroke();
       ctx.strokeStyle = '#7fb2ff';
@@ -611,12 +631,17 @@ export class UI {
       ctx.globalAlpha = .6;
       ctx.beginPath(); ctx.ellipse(W - 26, 106, 4, 7, 0, 0, 7); ctx.stroke();
       ctx.globalAlpha = 1;
+      }
     }
     // кнопка меню
     input.addButton('inv', W - 26, 60, 22, 'inventory');
+    const bmImg = this.uiImg('btnmenu');
+    if (bmImg) { ctx.drawImage(bmImg, W - 26 - 23, 60 - 23, 46, 46); }
+    else {
     ctx.fillStyle = 'rgba(21,19,16,0.85)'; ctx.beginPath(); ctx.arc(W - 26, 60, 18, 0, 7); ctx.fill();
     ctx.strokeStyle = '#8c6d1f'; ctx.lineWidth = 2; ctx.stroke();
     ctx.fillStyle = '#e8dcc0'; ctx.textAlign = 'center'; ctx.font = '15px Georgia'; ctx.fillText('\u2630', W - 26, 65);
+    }
     if (g.hero.statPts > 0 || g.hero.talentPts > 0) {
       ctx.fillStyle = '#ffd75e'; ctx.beginPath(); ctx.arc(W - 12, 46, 5, 0, 7); ctx.fill();
     }

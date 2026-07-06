@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+<defs>
+  <radialGradient id="ball" cx=".36" cy=".32" r="1">
+    <stop offset="0" stop-color="#f6dfa0"/><stop offset=".38" stop-color="#b8944a"/>
+    <stop offset=".72" stop-color="#6a4e1c"/><stop offset="1" stop-color="#241806"/>
+  </radialGradient>
+  <linearGradient id="rim" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#f0d48c"/><stop offset="1" stop-color="#3a2a0c"/>
+  </linearGradient>
+  <filter id="wear" x="-10%" y="-10%" width="120%" height="120%">
+    <feTurbulence type="fractalNoise" baseFrequency=".9" numOctaves="2" seed="9" result="n"/>
+    <feColorMatrix in="n" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  .9 .9 .9 0 -1.1" result="spots"/>
+    <feComposite in="spots" in2="SourceAlpha" operator="in" result="dark"/>
+    <feFlood flood-color="#170f05" flood-opacity=".5" result="dk"/>
+    <feComposite in="dk" in2="dark" operator="in" result="wl"/>
+    <feMerge><feMergeNode in="SourceGraphic"/><feMergeNode in="wl"/></feMerge>
+  </filter>
+</defs>
+<ellipse cx="130" cy="150" rx="98" ry="82" fill="rgba(0,0,0,.4)"/>
+<g filter="url(#wear)">
+  <circle cx="128" cy="124" r="100" fill="url(#ball)"/>
+  <circle cx="128" cy="124" r="100" fill="none" stroke="#140c02" stroke-width="4"/>
+  <circle cx="128" cy="124" r="62" fill="none" stroke="#1c1204" stroke-opacity=".75" stroke-width="5"/>
+  <circle cx="128" cy="124" r="67" fill="none" stroke="url(#rim)" stroke-opacity=".6" stroke-width="2.4"/>
+  <g stroke="#1a1004" stroke-opacity=".55" stroke-width="4" stroke-linecap="round">
+    <g id="nt"><path d="M128 34 v18"/></g>
+    <use href="#nt" transform="rotate(36 128 124)"/><use href="#nt" transform="rotate(72 128 124)"/>
+    <use href="#nt" transform="rotate(108 128 124)"/><use href="#nt" transform="rotate(144 128 124)"/>
+    <use href="#nt" transform="rotate(180 128 124)"/><use href="#nt" transform="rotate(216 128 124)"/>
+    <use href="#nt" transform="rotate(252 128 124)"/><use href="#nt" transform="rotate(288 128 124)"/>
+    <use href="#nt" transform="rotate(324 128 124)"/>
+  </g>
+  <ellipse cx="96" cy="80" rx="30" ry="16" fill="#fff6dd" opacity=".45" transform="rotate(-28 96 80)"/>
+</g>
+</svg>
