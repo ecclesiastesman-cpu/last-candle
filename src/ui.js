@@ -537,14 +537,15 @@ export class UI {
       const sock = this.skillSocket(27);
       bar.forEach((id, i) => {
         if (!id) return;
-        const ang = land ? Math.PI * (1.04 + i * .155) : Math.PI * (1.02 + i * .17);
-        const rad = land ? 88 : 108;
+        // шаг веера ≥ диаметра сокета — кнопки не налезают друг на друга
+        const ang = land ? Math.PI * (1.03 + i * .195) : Math.PI * (1.0 + i * .185);
+        const rad = land ? 90 : 110;
         const pos = { x: asx + Math.cos(ang) * rad, y: asy + Math.sin(ang) * rad };
-        input.addButton('sk' + (i + 1), pos.x, pos.y, 28, 'skill' + (i + 1));
+        input.addButton('sk' + (i + 1), pos.x, pos.y, 26, 'skill' + (i + 1));
         const usable = canUse(g, id);
         ctx.globalAlpha = usable ? 1 : .38;
         const sockImg = this.uiImg('socket');
-        if (sockImg) { const S = 27 * 2.5; ctx.drawImage(sockImg, pos.x - S / 2, pos.y - S / 2, S, S); }
+        if (sockImg) { const S = 27 * 2.4; ctx.drawImage(sockImg, pos.x - S / 2, pos.y - S / 2, S, S); }
         else ctx.drawImage(sock, pos.x - sock.width / 2, pos.y - sock.height / 2);
         ctx.strokeStyle = '#d9cba3'; ctx.fillStyle = '#d9cba3';
         ctx.save(); // глиф ложится на бронзу: чёрный фон иконки растворяется (screen), край режется по кругу

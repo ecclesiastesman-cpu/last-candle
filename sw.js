@@ -1,5 +1,5 @@
 // Service Worker: полный прекэш — игра работает без сети после первого открытия.
-const VERSION = 'lastcandle-v23';
+const VERSION = 'lastcandle-v24';
 const CORE = [
   './', './index.html', './manifest.webmanifest',
   './src/main.js', './src/core.js', './src/data.js', './src/strings.js', './src/items.js',
@@ -30,7 +30,7 @@ const FLARE = ['e_skeleton', 'e_skeleton_mage', 'e_zombie', 'e_goblin', 'e_antli
   'f_leather_hood', 'f_chain_coif', 'f_plate_helm', 'f_greatbow',
 ].map(n => './assets/flare/' + n + '.webp');
 const UIKIT = ['leather', 'slot', 'barbg', 'barfill', 'ornL', 'ornR', 'orbframe', 'attackring', 'socket', 'compass',
-  'movering', 'knobsteel', 'knobgold', 'btnmenu', 'btnportal', 'potionflask']
+  'movering', 'knobsteel', 'knobgold', 'btnmenu', 'btnportal', 'potionflask', 'goldpile']
   .map(n => './assets/ui/' + n + '.webp');
 const PORTRAITS = ['cls_barbarian', 'cls_huntress', 'cls_mage', 'cls_warlock', 'cls_druid', 'npc_elder', 'npc_vendor',
   'boss_bone', 'boss_plague', 'boss_executioner', 'boss_abyss'].map(n => './assets/portraits/' + n + '.webp');

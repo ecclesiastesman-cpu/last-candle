@@ -69,6 +69,38 @@ export class Renderer {
     }
     return c;
   }
+  // иконка без встроенной тёмной плиты (для земли): альфа по яркости, кэш
+  plateless(img) {
+    this._plCache = this._plCache || new Map();
+    let c = this._plCache.get(img.__id);
+    if (!c) {
+      c = document.createElement('canvas'); c.width = img.width; c.height = img.height;
+      const x = c.getContext('2d', { willReadFrequently: true });
+      x.drawImage(img, 0, 0);
+      const id = x.getImageData(0, 0, c.width, c.height);
+      const d = id.data;
+      for (let i = 0; i < d.length; i += 4) {
+        const m = Math.max(d[i], d[i + 1], d[i + 2]);
+        if (m < 58) d[i + 3] = 0;                       // плита — почти чёрная
+        else if (m < 92) d[i + 3] = Math.min(d[i + 3], (m - 58) * 7.5); // мягкая кромка
+      }
+      x.putImageData(id, 0, 0);
+      this._plCache.set(img.__id, c);
+    }
+    return c;
+  }
+  // картинка UI-кита для мировых дропов (кучка золота, фляга)
+  uiDropImg(name) {
+    this._uiDrop = this._uiDrop || new Map();
+    let e = this._uiDrop.get(name);
+    if (!e) {
+      e = { img: new Image(), ready: false };
+      e.img.onload = () => { e.ready = true; };
+      e.img.src = './assets/ui/' + name + '.webp';
+      this._uiDrop.set(name, e);
+    }
+    return e.ready ? e.img : null;
+  }
   // тонированный спрайт с кэшем
   tinted(img, tint, alpha = .55) {
     const key = img.__id + '|' + tint;
@@ -569,24 +601,23 @@ export class Renderer {
         ctx.beginPath(); ctx.arc(dpx, y, 9 * pul, 0, 7); ctx.fill();
         ctx.restore();
       } else if (d.kind === 'gold') {
-        const gi = this.assets['loot/coins'];
-        if (gi) ctx.drawImage(gi, dpx - 11, y - 14, 22, 22);
+        const gp = this.uiDropImg('goldpile') || this.assets['loot/coins'];
+        if (gp) ctx.drawImage(gp, dpx - 13, y - 17, 26, 26);
         else { ctx.fillStyle = '#ffd75e'; ctx.beginPath(); ctx.arc(dpx, y, 5, 0, 7); ctx.fill(); }
       } else if (d.kind === 'potion') {
-        const pi = this.assets['loot/hp_flask'];
-        if (pi) ctx.drawImage(pi, dpx - 12, y - 16, 24, 24);
+        const pi = this.uiDropImg('potionflask') || this.assets['loot/hp_flask'];
+        if (pi) ctx.drawImage(pi, dpx - 12, y - 17, 24, 24);
         else { ctx.fillStyle = '#c62828'; ctx.beginPath(); ctx.arc(dpx, y, 6, 0, 7); ctx.fill(); }
       } else {
         const col = ({ common: '#c8c2b8', magic: '#7aa9ff', rare: '#ffd75e', set: '#61d97a', unique: '#ff9840' })[d.item.rarity];
         ctx.save();
-        if (d.item.rarity !== 'common') {
-          const gs = this.glowSprite(col);
-          ctx.globalAlpha = .5 + Math.sin(timeS * 4) * .15;
-          ctx.drawImage(gs, dpx - 22, y - 22, 44, 44);
-          ctx.globalAlpha = 1;
-        }
+        // подложка-свечение: тёмный предмет без плиты читается на тёмном полу
+        const gs = this.glowSprite(d.item.rarity === 'common' ? '#c9b183' : col);
+        ctx.globalAlpha = d.item.rarity === 'common' ? .3 : .5 + Math.sin(timeS * 4) * .15;
+        ctx.drawImage(gs, dpx - 23, y - 23, 46, 46);
+        ctx.globalAlpha = 1;
         const icon = this.assets[d.item.icon];
-        if (icon) ctx.drawImage(icon, dpx - 15, y - 15, 30, 30);
+        if (icon) ctx.drawImage(this.plateless(icon), dpx - 17, y - 17, 34, 34);
         else { ctx.fillStyle = col; ctx.fillRect(dpx - 8, y - 8, 16, 16); }
         ctx.restore();
         // луч света для редких+
