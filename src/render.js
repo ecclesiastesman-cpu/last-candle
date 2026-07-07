@@ -442,7 +442,9 @@ export class Renderer {
       ctx.beginPath(); ctx.ellipse(0, 5, 17, 7, 0, 0, 7); ctx.fill();
       if (h.hurtT > 0) ctx.globalAlpha = .6 + Math.sin(timeS * 60) * .3;
       const anim = h.dead ? 'die' : h.action ? h.action.name : h.moving ? 'run' : 'stance';
-      const t = h.dead ? h.deadT * 1000 : h.action ? h.action.t : h.animT * 1000;
+      // цикл бега масштабируется от скорости движения (базовая 150) — ноги не скользят
+      const t = h.dead ? h.deadT * 1000 : h.action ? h.action.t * (h.action.rate || 1)
+        : h.animT * 1000 * (h.moving ? (g.stats?.moveSpeed || 150) / 150 : 1);
       // редкость оружия — свечение под ногами
       const wr = h.equip.weapon?.rarity;
       if (wr && wr !== 'common' && wr !== 'magic') {
@@ -670,12 +672,12 @@ export class Renderer {
         ctx.beginPath(); ctx.arc(0, 0, tg.r * f, 0, 7); ctx.fill();
         ctx.globalAlpha = .8; ctx.strokeStyle = '#ff5546'; ctx.lineWidth = 2.5;
         ctx.beginPath(); ctx.arc(0, 0, tg.r, 0, 7); ctx.stroke();
-      } else { // сектор удара
+      } else { // сектор удара (мягкая заливка: перекрытия в толпе не сливаются в пятно)
         const a0 = tg.angle - tg.spread / 2, a1 = tg.angle + tg.spread / 2;
-        ctx.globalAlpha = .2;
+        ctx.globalAlpha = .12;
         ctx.fillStyle = '#c62828';
         ctx.beginPath(); ctx.moveTo(0, 0); ctx.arc(0, 0, tg.r, a0, a1); ctx.closePath(); ctx.fill();
-        ctx.globalAlpha = .4;
+        ctx.globalAlpha = .28;
         ctx.beginPath(); ctx.moveTo(0, 0); ctx.arc(0, 0, tg.r * f, a0, a1); ctx.closePath(); ctx.fill();
         ctx.globalAlpha = .75; ctx.strokeStyle = '#ff5546'; ctx.lineWidth = 2;
         ctx.beginPath(); ctx.moveTo(0, 0); ctx.arc(0, 0, tg.r, a0, a1); ctx.closePath(); ctx.stroke();
@@ -797,9 +799,9 @@ export class Renderer {
       const pop = n.t > .68 ? 1.55 - (0.8 - n.t) * 4.6 : 1;
       ctx.translate(n.x, n.y);
       ctx.scale(pop, pop);
-      ctx.font = (n.big ? 'bold 26px' : 'bold 16px') + ' Georgia, serif';
+      ctx.font = (n.big ? 'bold 28px' : 'bold 19px') + ' Georgia, serif';
       ctx.textAlign = 'center';
-      ctx.strokeStyle = 'rgba(0,0,0,0.85)'; ctx.lineWidth = n.big ? 4.5 : 3.2; ctx.strokeText(n.txt, 0, 0);
+      ctx.strokeStyle = 'rgba(0,0,0,0.85)'; ctx.lineWidth = n.big ? 5 : 3.6; ctx.strokeText(n.txt, 0, 0);
       ctx.fillStyle = n.c; ctx.fillText(n.txt, 0, 0);
       ctx.restore();
     }

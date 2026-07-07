@@ -62,7 +62,7 @@ export function damageMob(g, m, raw, opts = {}) {
   if (opts.root && !m.boss) m.rootT = Math.max(m.rootT, opts.root);
   if (opts.dot) m.dots.push({ dps: opts.dot, t: opts.dotT || 4, elem: opts.elem || 'poison' });
   bus.emit('hit', m, dmg, opts);
-  g.fx.number(m.x, m.y - m.r - 6, Math.round(dmg), opts.crit ? '#ffd75e' : opts.elem ? ({ fire: '#ff7043', cold: '#4fc3f7', light: '#b388ff', poison: '#9ccc65' })[opts.elem] : '#eee', opts.crit);
+  g.fx.number(m.x, m.y - m.r - 6, Math.round(dmg), opts.crit ? '#ffd75e' : opts.elem ? ({ fire: '#ff7043', cold: '#4fc3f7', light: '#b388ff', poison: '#9ccc65' })[opts.elem] : '#fff2d8', opts.crit);
   if (m.hp <= 0) killMob(g, m);
 }
 
@@ -174,7 +174,7 @@ export function thornsBack(g, m) {
 export function updateMob(g, m, dt) {
   m.animT += dt;
   m.moving = false;
-  if (m.action) { m.action.t += dt * 1000; if (m.action.t > 650) m.action = null; }
+  if (m.action) { m.action.t += dt * 1000; if (m.action.t > (m.action.dur || 650)) m.action = null; }
   if (m.hitT > 0) m.hitT -= dt;
   // доты
   for (let i = m.dots.length - 1; i >= 0; i--) {
@@ -227,7 +227,7 @@ export function updateMob(g, m, dt) {
     else if (d < 140) { moveMob(g, m, -dx / d, -dy / d, sp * .8, dt); }
     if (m.cd <= 0 && d < 460 && losClear(g.floor, m.x, m.y, h.x, h.y)) {
       m.cd = 2.2;
-      m.action = { name: 'cast', t: 0 };
+      m.action = { name: 'cast', t: 0, dur: m.flare ? g.flare?.animDur(m.flare, 'cast') : 0 };
       g.projectiles.push({ from: 'mob', x: m.x, y: m.y, vx: dx / d * 300, vy: dy / d * 300, r: 7,
         dmg: m.dmg, elem: m.proj === 'fire' ? 'fire' : null, ttl: 2.2, color: m.proj === 'fire' ? '#ff7043' : '#b388ff', lvl: m.lvl });
       bus.emit('mobCast', m);
@@ -238,11 +238,14 @@ export function updateMob(g, m, dt) {
     if (m.lunge && d < 200 && d > 70 && m.cd <= 0) { m.vx = dx / d * 520; m.vy = dy / d * 520; m.lungeT = .25; m.cd = 2.5; }
     if (m.lungeT > 0) { m.lungeT -= dt; moveMob(g, m, m.vx / 520, m.vy / 520, 520, dt); }
     else if (d > m.r + 16) moveMob(g, m, dx / d, dy / d, sp, dt);
-    if (d < m.r + 26 && m.cd <= 0) {
+    // слот-лимит: не больше 3 одновременных замахов по герою — всегда есть окно уворота
+    if (d < m.r + 26 && m.cd <= 0 && g.mobs.reduce((n, o) => n + (o.windup > 0 && !o.dead ? 1 : 0), 0) >= 3) {
+      m.cd = .3 + g.rng.range(0, .4);
+    } else if (d < m.r + 26 && m.cd <= 0) {
       // замах 0.42с с красным сектором — можно выйти из-под удара
       m.cd = 1.25;
       m.windup = .48;
-      m.action = { name: 'swing', t: 0 };
+      m.action = { name: 'swing', t: 0, dur: m.flare ? g.flare?.animDur(m.flare, 'swing') : 0 };
       const ang = Math.atan2(dy, dx);
       g.telegraphs.push({ kind: 'arc', src: m, r: m.r + 52, angle: ang, spread: 1.6, t: 0, dur: .48, hit: () => {
         if (m.dead || m.stunT > 0 || m.freezeT > 0 || m.fearT > 0) return;
@@ -290,7 +293,7 @@ function updateAlly(g, m, dt) {
   if (d > m.r + target.r + 6) moveMob(g, m, dx / d, dy / d, m.speed, dt);
   else if (m.cd <= 0) {
     m.cd = 1;
-    m.action = { name: 'swing', t: 0 };
+    m.action = { name: 'swing', t: 0, dur: m.flare ? g.flare?.animDur(m.flare, 'swing') : 0 };
     const dmg = m.dmg * (1 + s.minionDmg);
     target.hp -= dmg; target.hitT = .12; target.aggro = true;
     g.fx.number(target.x, target.y - target.r, Math.round(dmg), '#7fd6a0');
@@ -306,7 +309,7 @@ function updateBoss(g, m, dt, d, dx, dy) {
   else if (m.cd <= 0) {
     m.cd = enraged ? .9 : 1.3;
     m.windup = .5;
-    m.action = { name: 'swing', t: 0 };
+    m.action = { name: 'swing', t: 0, dur: m.flare ? g.flare?.animDur(m.flare, 'swing') : 0 };
     const ang = Math.atan2(dy, dx);
     g.telegraphs.push({ kind: 'arc', src: m, r: m.r + 64, angle: ang, spread: 1.9, t: 0, dur: .5, hit: () => {
       if (m.dead || m.stunT > 0 || m.freezeT > 0) return;

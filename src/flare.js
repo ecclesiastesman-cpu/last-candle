@@ -149,12 +149,56 @@ export class Flare {
     const anim = s.meta.anims[animName] || s.meta.anims.stance;
     const [row, flip] = rowFlip(angle);
     const col = anim.start + frameOf(anim, tMs);
+    const cv = s.canvases ? s.canvases[(col / s.chunkCols) | 0] : s.canvas;
+    const ccol = s.canvases ? col % s.chunkCols : col;
+    if (!cv) return false;
     ctx.save();
     ctx.translate(x, y);
     if (flip) ctx.scale(-scale, scale); else ctx.scale(scale, scale);
-    ctx.drawImage(s.canvas, col * s.meta.cw, row * s.meta.ch, s.meta.cw, s.meta.ch,
+    ctx.drawImage(cv, ccol * s.meta.cw, row * s.meta.ch, s.meta.cw, s.meta.ch,
       flip ? -(s.meta.cw - s.meta.ax) : -s.meta.ax, -s.meta.ay, s.meta.cw, s.meta.ch);
     ctx.restore();
+    return true;
+  }
+
+  // ---- v25: кукла из Blender-слоёв (body + chest_tX + helm_tX + weapon) ----
+  // реестр выложенных классов: не трогаем сеть (и консоль 404-ами), пока ассетов нет
+  static B25 = new Set(['barbarian', 'huntress', 'mage', 'warlock', 'druid']);
+  async b25Meta(cls) {
+    if (!Flare.B25.has(cls)) return null;
+    this._b25 = this._b25 || new Map();
+    if (this._b25.has(cls)) return this._b25.get(cls);
+    let m = null;
+    try { m = await (await fetch(`./assets/flare/b25_${cls}.json`)).json(); } catch {}
+    this._b25.set(cls, m);
+    return m;
+  }
+  async composeHeroB25(cls, names, key) {
+    if (this.heroKey === key && this.heroSheet) return true;
+    const meta = await this.b25Meta(cls);
+    if (!meta) return false;
+    const imgs = await Promise.all(names.map(n => new Promise(res => {
+      const im = new Image();
+      im.onload = () => res(im); im.onerror = () => res(null);
+      im.src = `./assets/flare/${n}.webp`;
+    })));
+    if (!imgs[0]) return false; // нет тела — нет куклы
+    const cols = Object.values(meta.anims).reduce((s, a) => Math.max(s, a.start + a.frames), 0);
+    const chunkCols = 20; // 20*256=5120 < лимита стороны канваса iOS (8192)
+    const canvases = [];
+    for (let c0 = 0; c0 < cols; c0 += chunkCols) {
+      const n = Math.min(chunkCols, cols - c0);
+      const cv = document.createElement('canvas');
+      cv.width = n * meta.cw; cv.height = 5 * meta.ch;
+      const cx = cv.getContext('2d');
+      for (const im of imgs) {
+        if (!im) continue;
+        cx.drawImage(im, c0 * meta.cw, 0, n * meta.cw, 5 * meta.ch, 0, 0, n * meta.cw, 5 * meta.ch);
+      }
+      canvases.push(cv);
+    }
+    this.heroSheet = { canvases, chunkCols, meta };
+    this.heroKey = key;
     return true;
   }
 }

@@ -349,7 +349,9 @@ export class UI {
     const probe = document.createElement('canvas');
     probe.width = m.cw; probe.height = m.ch;
     const px2 = probe.getContext('2d', { willReadFrequently: true });
-    px2.drawImage(s.canvas, anim.start * m.cw, 4 * m.ch, m.cw, m.ch, 0, 0, m.cw, m.ch);
+    const cv2 = s.canvases ? s.canvases[(anim.start / s.chunkCols) | 0] : s.canvas;
+    const cc2 = s.canvases ? anim.start % s.chunkCols : anim.start;
+    px2.drawImage(cv2, cc2 * m.cw, 4 * m.ch, m.cw, m.ch, 0, 0, m.cw, m.ch);
     let top = m.ay - 96;
     try {
       const id = px2.getImageData(Math.max(0, m.ax - 14), 0, 28, m.ch).data;
@@ -359,7 +361,9 @@ export class UI {
     } catch {}
     const headCY = top + 17; // центр головы чуть ниже макушки
     const half = 30;
-    x.drawImage(s.canvas, anim.start * m.cw + m.ax - half, 4 * m.ch + headCY - half * .9,
+    const cv3 = s.canvases ? s.canvases[(anim.start / s.chunkCols) | 0] : s.canvas;
+    const cc3 = s.canvases ? anim.start % s.chunkCols : anim.start;
+    x.drawImage(cv3, cc3 * m.cw + m.ax - half, 4 * m.ch + headCY - half * .9,
       half * 2, half * 2, 5, 7, D - 10, D - 14);
     x.restore();
     // лёгкая внутренняя виньетка, чтобы портрет «сидел» в раме
@@ -568,6 +572,13 @@ export class UI {
         } else if (usable) { // готово: тонкое свечение
           ctx.strokeStyle = 'rgba(255,215,120,0.35)'; ctx.lineWidth = 1.6;
           ctx.beginPath(); ctx.arc(pos.x, pos.y, 27.5, 0, 7); ctx.stroke();
+        } else if ((SKILLS[id]?.cost || 0) > g.hero.res) { // нет ресурса: синяя приглушёнка + цена (DI)
+          ctx.fillStyle = 'rgba(40,70,140,0.38)';
+          ctx.beginPath(); ctx.arc(pos.x, pos.y, 25, 0, 7); ctx.fill();
+          ctx.fillStyle = '#9fc4ff'; ctx.font = 'bold 13px Georgia'; ctx.textAlign = 'center';
+          ctx.strokeStyle = 'rgba(0,0,0,0.8)'; ctx.lineWidth = 3;
+          ctx.strokeText(SKILLS[id].cost, pos.x, pos.y + 4);
+          ctx.fillText(SKILLS[id].cost, pos.x, pos.y + 4);
         }
         ctx.globalAlpha = 1;
       });
@@ -971,7 +982,9 @@ export class UI {
     c.width = s.meta.cw * scale; c.height = s.meta.ch * scale;
     const x = c.getContext('2d');
     x.imageSmoothingQuality = 'high';
-    x.drawImage(s.canvas, anim.start * s.meta.cw, 4 * s.meta.ch, s.meta.cw, s.meta.ch, 0, 0, c.width, c.height);
+    const cv4 = s.canvases ? s.canvases[(anim.start / s.chunkCols) | 0] : s.canvas;
+    const cc4 = s.canvases ? anim.start % s.chunkCols : anim.start;
+    x.drawImage(cv4, cc4 * s.meta.cw, 4 * s.meta.ch, s.meta.cw, s.meta.ch, 0, 0, c.width, c.height);
     return c.toDataURL();
   }
   // превью класса: один кадр (юг, stance), слои собираются на лету

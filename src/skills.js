@@ -5,6 +5,15 @@ import { dist2, clamp, bus, isoAngle } from './core.js';
 import { damageMob, makeMob, healHero } from './entities.js';
 
 export function skillRank(hero, id) { return hero.talents[id] || 0; }
+
+// действие героя: длительность клипа из меты листа, темп проигрывания подгоняется
+// под скорость атаки — быстрые билды ускоряют анимацию, а не режут её кадры
+function mkAction(g, name, atkSpeed) {
+  const dur = g.flare?.heroSheet?.meta?.anims?.[name]?.dur ?? 520;
+  // потолок ×3: на пределе скорости атаки замах остаётся различимым
+  const rate = Math.max(1, Math.min(3, dur * (atkSpeed || 1) / 1000));
+  return { name, t: 0, dur, rate };
+}
 export function skillDmg(g, sk, rank) {
   const base = sk.dmg ? sk.dmg[0] + sk.dmg[1] * (rank - 1 + g.stats.plusSkills) : 0;
   return base * g.stats.dmgTotal;
@@ -35,7 +44,10 @@ export function useSkill(g, id, aimX, aimY) {
   const dmg = skillDmg(g, sk, rank);
   h.attackT = .22; h.dir = nx < 0 ? -1 : 1;
   h.faceAngle = isoAngle(nx, ny);
-  h.action = { name: sk.kind === 'melee' || sk.kind === 'dash' ? 'swing' : (g.cls.weapons.includes('bow') ? 'shoot' : 'cast'), t: 0 };
+  // вихрь/новы у не-кастеров без лука — это взмах оружием, а не каст
+  const meleeNova = sk.kind === 'nova' && !g.cls.weapons.includes('staff') && !g.cls.weapons.includes('bow');
+  h.action = mkAction(g, sk.kind === 'melee' || sk.kind === 'dash' || meleeNova ? 'swing'
+    : (g.cls.weapons.includes('bow') ? 'shoot' : 'cast'), s.attackSpeed);
   bus.emit('skill', sk, id);
 
   switch (sk.kind) {
@@ -177,7 +189,7 @@ export function basicAttack(g, aimX, aimY) {
   h.dir = dx < 0 ? -1 : 1; h.attackT = .2;
   h.faceAngle = isoAngle(dx, dy);
   const isRangedA = wpn?.ranged || (wpn?.caster && (h.cls === 'mage' || h.cls === 'warlock'));
-  h.action = { name: h.form ? 'swing' : isRangedA ? (wpn?.ranged ? 'shoot' : 'cast') : 'swing', t: 0 };
+  h.action = mkAction(g, h.form ? 'swing' : isRangedA ? (wpn?.ranged ? 'shoot' : 'cast') : 'swing', s.attackSpeed);
   bus.emit('attack', h);
   const dmgRoll = () => g.rng.range(s.wDmg[0], s.wDmg[1]) * (1 + s[cls.gain.dmgStat] * .012) * (1 + s.dmgMul) + s.dmgFlat;
   const isRanged = wpn?.ranged || (wpn?.caster && (h.cls === 'mage' || h.cls === 'warlock'));
