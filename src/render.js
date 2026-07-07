@@ -53,7 +53,7 @@ export class Renderer {
     this.canvas.style.width = innerWidth + 'px'; this.canvas.style.height = innerHeight + 'px';
     this.ctx.imageSmoothingQuality = 'high';
     this.lightCanvas.width = Math.ceil(innerWidth / 4); this.lightCanvas.height = Math.ceil(innerHeight / 4);
-    this.zoom = clamp(Math.min(innerWidth, innerHeight) / 760, .5, .95);
+    this.zoom = clamp(Math.min(innerWidth, innerHeight) / 700, .56, .95); // герой крупнее на телефоне (DI-аудит)
   }
   // предзапечённое радиальное свечение (замена shadowBlur в горячих циклах)
   glowSprite(color) {
@@ -425,6 +425,24 @@ export class Renderer {
     }
   }
 
+  // x-ray: призрак героя поверх сцены — виден за стенами, подсвечен в свалке (DI-парити)
+  drawHeroXray(g, timeS) {
+    const h = g.hero;
+    if (h.dead || h.form || !g.flare?.heroSheet) return;
+    const { ctx } = this;
+    const [px, py] = proj(h.x, h.y);
+    const s = g.flare.heroSheet;
+    const fscale = 108 / s.meta.ay;
+    const anim = h.action ? h.action.name : h.moving ? 'run' : 'stance';
+    const t = h.action ? h.action.t * (h.action.rate || 1)
+      : h.animT * 1000 * (h.moving ? (g.stats?.moveSpeed || 150) / 150 : 1);
+    ctx.save();
+    ctx.globalAlpha = .16;
+    ctx.globalCompositeOperation = 'screen';
+    g.flare.drawHeroSheet(ctx, px, py + 4, anim, t, h.faceAngle, fscale);
+    ctx.restore();
+  }
+
   // герой: анимированная кукла Flare (слои экипировки); формы друида — статичный спрайт
   drawHero(g, timeS) {
     const { ctx } = this;
@@ -530,6 +548,13 @@ export class Renderer {
         const anim = m.action ? m.action.name : m.moving ? 'run' : 'stance';
         const t = m.action ? m.action.t : m.animT * 1000;
         drawn = g.flare.draw(ctx, m.flare, 0, 4, anim, t, m.angle, fscale);
+        if (drawn && m.hitT > .05) { // белая вспышка попадания (DI-вес удара)
+          ctx.save();
+          ctx.globalCompositeOperation = 'screen';
+          ctx.globalAlpha = Math.min(1, m.hitT / .12) * .75;
+          g.flare.draw(ctx, m.flare, 0, 4, anim, t, m.angle, fscale);
+          ctx.restore();
+        }
         if (drawn && m.tint && m.type === 'ally') { // метка слуги
           ctx.fillStyle = m.tint; ctx.globalAlpha = .9;
           ctx.beginPath(); ctx.arc(0, -fm.ay * fscale - 7, 3.2, 0, 7); ctx.fill(); ctx.globalAlpha = 1;

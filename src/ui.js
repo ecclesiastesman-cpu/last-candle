@@ -332,6 +332,39 @@ export class UI {
 
   // круглый портрет героя (DI): голова с собранной куклы Flare, кэш по экипировке
   portraitCache(g) {
+    // v27: живописный портрет класса (Wesnoth-арт) — читается в раме, в отличие
+    // от тёмного автокропа со спрайт-листа (вердикт DI-аудита)
+    const cls = g.hero?.cls;
+    if (cls) {
+      this._artPort = this._artPort || new Map();
+      let e = this._artPort.get(cls);
+      if (!e) {
+        e = { img: new Image(), ready: false };
+        e.img.onload = () => { e.ready = true; this._portKey = null; };
+        e.img.onerror = () => { e.failed = true; };
+        e.img.src = './assets/portraits/cls_' + cls + '.webp';
+        this._artPort.set(cls, e);
+      }
+      if (e.ready) {
+        const key = 'art_' + cls;
+        if (this._port && this._portKey === key) return this._port;
+        const D = 108;
+        const c = document.createElement('canvas'); c.width = c.height = D;
+        const x = c.getContext('2d');
+        x.imageSmoothingQuality = 'high';
+        const bg = x.createRadialGradient(D / 2, D * .38, 6, D / 2, D / 2, D / 2);
+        bg.addColorStop(0, '#5a4527'); bg.addColorStop(.7, '#241a0c'); bg.addColorStop(1, '#0a0704');
+        x.fillStyle = bg; x.beginPath(); x.arc(D / 2, D / 2, D / 2, 0, 7); x.fill();
+        x.save(); x.beginPath(); x.arc(D / 2, D / 2, D / 2 - 1, 0, 7); x.clip();
+        // cover-кроп к верхней части (голова)
+        const im = e.img, k = Math.max(D / im.width, D / im.height) * 1.12;
+        const w = im.width * k, h2 = im.height * k;
+        x.drawImage(im, (D - w) / 2, -h2 * .02, w, h2);
+        x.restore();
+        this._port = c; this._portKey = key;
+        return c;
+      }
+    }
     const s = g.flare?.heroSheet;
     if (!s) return null;
     const key = g.flare.heroKey;

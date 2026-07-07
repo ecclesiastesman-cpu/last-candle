@@ -6,6 +6,11 @@ import { damageMob, makeMob, healHero } from './entities.js';
 
 export function skillRank(hero, id) { return hero.talents[id] || 0; }
 
+// отложенный удар: урон применяется в кадре КОНТАКТА замаха, а не нажатия (DI-вес)
+// очередь живёт в g.pendingStrikes и обрабатывается в update — наследует hit-stop
+function queueStrike(g, delayS, run) { (g.pendingStrikes ||= []).push({ t: 0, at: delayS, run }); }
+const contactS = a => Math.min(Math.max(.35 * a.dur / a.rate, 90), 260) / 1000;
+
 // действие героя: длительность клипа из меты листа, темп проигрывания подгоняется
 // под скорость атаки — быстрые билды ускоряют анимацию, а не режут её кадры
 function mkAction(g, name, atkSpeed) {
@@ -53,18 +58,20 @@ export function useSkill(g, id, aimX, aimY) {
   switch (sk.kind) {
     case 'melee': {
       const ang = Math.atan2(ny, nx);
-      for (const m of g.mobs) {
-        if (m.dead || m.type === 'ally') continue;
-        const md = Math.hypot(m.x - h.x, m.y - h.y);
-        if (md > sk.range + m.r) continue;
-        const ma = Math.atan2(m.y - h.y, m.x - h.x);
-        let da = Math.abs(ma - ang); if (da > Math.PI) da = 2 * Math.PI - da;
-        if (da > (sk.arc || 2) / 2) continue;
-        let dd = dmg;
-        if (sk.execBonus && m.hp < m.maxHp * .3) dd *= 1 + sk.execBonus * rank;
-        damageMob(g, m, dd, { stun: sk.stun, dot: sk.bleed ? (sk.bleed[0] + sk.bleed[1] * rank) * s.dmgTotal / 3 : 0, dotT: 3, elem: sk.elem });
-      }
-      g.fx.slash(h.x, h.y, ang, sk.range);
+      queueStrike(g, contactS(h.action), () => {
+        for (const m of g.mobs) {
+          if (m.dead || m.type === 'ally') continue;
+          const md = Math.hypot(m.x - h.x, m.y - h.y);
+          if (md > sk.range * 1.08 + m.r) continue; // +8%: цель успевает сместиться за замах
+          const ma = Math.atan2(m.y - h.y, m.x - h.x);
+          let da = Math.abs(ma - ang); if (da > Math.PI) da = 2 * Math.PI - da;
+          if (da > (sk.arc || 2) / 2) continue;
+          let dd = dmg;
+          if (sk.execBonus && m.hp < m.maxHp * .3) dd *= 1 + sk.execBonus * rank;
+          damageMob(g, m, dd, { stun: sk.stun, dot: sk.bleed ? (sk.bleed[0] + sk.bleed[1] * rank) * s.dmgTotal / 3 : 0, dotT: 3, elem: sk.elem });
+        }
+        g.fx.slash(h.x, h.y, ang, sk.range);
+      });
       break;
     }
     case 'nova': {
@@ -195,22 +202,24 @@ export function basicAttack(g, aimX, aimY) {
   const isRanged = wpn?.ranged || (wpn?.caster && (h.cls === 'mage' || h.cls === 'warlock'));
   if (h.form === 'wolf' || h.form === 'bear' || (!isRanged)) {
     const range = h.form === 'bear' ? 66 : 56, ang = Math.atan2(dy, dx);
-    let hitAny = false;
-    for (const m of g.mobs) {
-      if (m.dead || m.type === 'ally') continue;
-      const md = Math.hypot(m.x - h.x, m.y - h.y);
-      if (md > range + m.r) continue;
-      const ma = Math.atan2(m.y - h.y, m.x - h.x);
-      let da = Math.abs(ma - ang); if (da > Math.PI) da = 2 * Math.PI - da;
-      if (da > 1.1) continue;
-      damageMob(g, m, dmgRoll() * (h.form === 'bear' ? 1.25 : h.form === 'wolf' ? 1.1 : 1));
-      hitAny = true;
-    }
-    g.fx.slash(h.x, h.y, ang, range);
-    if (hitAny) {
-      g.fx.shake(2);
-      if (cls.resOnHit) h.res = Math.min(s.maxRes, h.res + cls.resOnHit); // ресурс только за попадание
-    }
+    queueStrike(g, contactS(h.action), () => {
+      let hitAny = false;
+      for (const m of g.mobs) {
+        if (m.dead || m.type === 'ally') continue;
+        const md = Math.hypot(m.x - h.x, m.y - h.y);
+        if (md > range * 1.08 + m.r) continue;
+        const ma = Math.atan2(m.y - h.y, m.x - h.x);
+        let da = Math.abs(ma - ang); if (da > Math.PI) da = 2 * Math.PI - da;
+        if (da > 1.1) continue;
+        damageMob(g, m, dmgRoll() * (h.form === 'bear' ? 1.25 : h.form === 'wolf' ? 1.1 : 1));
+        hitAny = true;
+      }
+      g.fx.slash(h.x, h.y, ang, range);
+      if (hitAny) {
+        g.fx.shake(2);
+        if (cls.resOnHit) h.res = Math.min(s.maxRes, h.res + cls.resOnHit); // ресурс только за попадание
+      }
+    });
   } else {
     if (cls.resOnHit) h.res = Math.min(s.maxRes, h.res + cls.resOnHit);
     g.projectiles.push({ from: 'hero', x: h.x, y: h.y - 14, vx: dx / d * 520, vy: dy / d * 520, r: 5,
